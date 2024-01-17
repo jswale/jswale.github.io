@@ -2,40 +2,33 @@
     <head>
         <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
         <style type="text/css">
-body *{
-  box-sizing: border-box;
+@import url('https://fonts.googleapis.com/css2?family=Montserrat&display=swap');
+.cards {
+    display: grid;
+    grid-template-columns: repeat(4, 150px);
+    gap: 20px;
+    padding:20px;
 }
-.resp-table{
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  height:100px;
-  width:800px;
-}
-.resp-table>.td{
-  flex-basis: 22%;
-  min-width: 22%;
-  border: 1px solid #888;
-  position:relative;
-  padding: 1em;
-  margin: 5px;
-  height:100%;
-  font-weight:bold;
-  text-align: center;
-}
-.resp-table>.td.selected{
-    background-color: cadetblue;
-    color: white;
-}
-.resp-table>.-row-span-2{
-  padding:0;
-}
-.resp-table>.-row-span-2>.row-span{
-  height:200%;
-  padding: 1em;
-  background-color: white;
-  z-index:20;
+
+.card {
+  width: 100%;
+  padding-top: 100%;
   position: relative;
+  box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+  border-radius: 10px;
+}
+.card.selected {
+    background-color: rgb(227, 252, 239);
+  box-shadow: rgba(0, 0, 0, 0.54) 0px 3px 8px;
+}
+
+.card div {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Montserrat', sans-serif;
+    text-align: center;
 }
           </style>    
           </head>
@@ -45,8 +38,8 @@ body *{
             const gridSize = 4;
             Vue.createApp({
               template: `
-              <div class="resp-table">
-                <div v-for="(topic, index) in topics" :key="topic" :index="index" :class="{ td: true, selected: selected[index] }" @click="click(topic, index)">{{topic}}</div>
+              <div class="cards">
+                <div v-for="(topic, index) in topics" :key="topic" :index="index" :class="{ card: true, selected: selected[index] }" @click="click(topic, index)"><div>{{topic}}</div></div>
                 </div>
               `,
               methods: {
