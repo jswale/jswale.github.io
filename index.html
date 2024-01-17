@@ -1,0 +1,100 @@
+<html>
+    <head>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <style type="text/css">
+body *{
+  box-sizing: border-box;
+}
+.resp-table{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  height:100px;
+  width:800px;
+}
+.resp-table>.td{
+  flex-basis: 22%;
+  min-width: 22%;
+  border: 1px solid #888;
+  position:relative;
+  padding: 1em;
+  margin: 5px;
+  height:100%;
+  font-weight:bold;
+  text-align: center;
+}
+.resp-table>.td.selected{
+    background-color: cadetblue;
+    color: white;
+}
+.resp-table>.-row-span-2{
+  padding:0;
+}
+.resp-table>.-row-span-2>.row-span{
+  height:200%;
+  padding: 1em;
+  background-color: white;
+  z-index:20;
+  position: relative;
+}
+          </style>    
+          </head>
+    <body>
+        <div id="app">{{ message }}</div>
+        <script>
+            const gridSize = 4;
+            Vue.createApp({
+              template: `
+              <div class="resp-table">
+                <div v-for="(topic, index) in topics" :key="topic" :index="index" :class="{ td: true, selected: selected[index] }" @click="click(topic, index)">{{topic}}</div>
+                </div>
+              `,
+              methods: {
+                click: function (key, idx) {
+                console.log(key, idx);
+                this.selected[idx] = !this.selected[idx];
+            }
+              },
+              data() {
+                return {
+                    selected : Array(gridSize*gridSize).fill(false),
+                  topics: [
+                  'Release',
+'Portal',
+'Upgrade',
+'Mailjet',
+'Disk space',
+'TransactionInfo',
+'Bug',
+'Feature',
+'JIRA',
+'Database',
+'Regression',
+'Support',
+'Migration',
+'Production',
+'V5',
+'V6',
+'Slack',
+'Teams',
+'Issue',
+'IP',
+'USS',
+'Fix',
+'QA',
+'Apps',
+'Plan',
+'Cache',
+'DNS',
+'Problem',
+'Cache',
+'Version',
+'Meeting',
+'O2C',
+'Email',
+'PDF'].sort(() => Math.random() - 0.5).slice(0, gridSize*gridSize)
+                }
+              }
+            }).mount('#app');
+            </script>    </body>    
+</html>
