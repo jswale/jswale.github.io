@@ -1,8 +1,9 @@
 <html>
     <head>
         <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         <style type="text/css">
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap');
 
 #app {
   width:fit-content;
@@ -21,13 +22,12 @@
   width: 100%;
   padding-top: 100%;
   position: relative;
-  box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+  border: 1px solid grey;
   border-radius: 10px;
 }
 .card.selected {
-    background-color: rgba(137, 188, 85, 0.7);
+    background-color: rgb(174, 209, 141);
     color: #FFFFFF;
-  box-shadow: rgba(0, 0, 0, 0.54) 0px 3px 8px;
 }
 
 .card div {
@@ -63,7 +63,7 @@
     -webkit-box-shadow: 0 0 0 0 rgba(255,0,0, 0.4);
   }
   70% {
-      -webkit-box-shadow: 0 0 0 10px rgba(255,0,0, 0);
+      -webkit-box-shadow: 0 0 0 15px rgba(255,0,0, 0);
   }
   100% {
       -webkit-box-shadow: 0 0 0 0 rgba(255,0,0, 0);
@@ -75,8 +75,8 @@
     box-shadow: 0 0 0 0 rgba(255,0,0, 0.4);
   }
   70% {
-      -moz-box-shadow: 0 0 0 10px rgba(255,0,0, 0);
-      box-shadow: 0 0 0 10px rgba(255,0,0, 0);
+      -moz-box-shadow: 0 0 0 15px rgba(255,0,0, 0);
+      box-shadow: 0 0 0 15px rgba(255,0,0, 0);
   }
   100% {
       -moz-box-shadow: 0 0 0 0 rgba(255,0,0, 0);
@@ -98,23 +98,31 @@
               `,
               methods: {
                 click: function (key, idx) {
-                this.selected[idx] = !this.selected[idx];
-                const col = idx % gridSize;
-                const line = Math.floor(idx/gridSize);
-                // Check line
-                const bingoLine = this.selected.slice(gridSize*line, gridSize*(line+1)).some((v) => v === false) === false;
-                const cells = [];
-                for(let i = 0; i < gridSize; i++) {
-                    cells[i] = this.selected[col + gridSize * i];
-                }
-                const bingoColumn = cells.some((v) => v === false) === false;
-                console.log({bingoColumn, bingoLine, cells})
-                this.bingo = bingoColumn || bingoLine;
+                  this.selected[idx] = !this.selected[idx];
+                  const col = idx % gridSize;
+                  const line = Math.floor(idx/gridSize);
+
+                  const isBingo = (values) => values.some((v) => v === false) === false;
+                  // Check line
+                  const bingoLine = isBingo(this.selected.slice(gridSize*line, gridSize*(line+1)));
+                  const bingoColumn = isBingo(Array(gridSize).fill(0).map((_, i) => this.selected[col + gridSize * i]));
+                  this.bingo = bingoColumn || bingoLine;
+                  if (this.bingo === true) {
+                    setTimeout(() => {
+                      html2canvas(document.querySelector(".cards")).then(canvas => {
+                        canvas.toBlob(function(blob) { 
+                          const item = new ClipboardItem({ "image/png": blob });
+                          navigator.clipboard.write([item]); 
+                        });                      
+                      });                      
+                    }, 0);                    
+                  }
                 }
               },
               data() {
                 return {
                     bingo: false,
+                    screenshot: false,
                     selected : Array(gridSize*gridSize).fill(false),
                   topics: [
                   'Release',
