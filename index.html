@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Validator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; min-height: 100vh; display: flex; justify-content: center; padding: 40px 20px; color: #333; }
+    .container { max-width: 900px; width: 100%; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    h1 { font-size: 1.6rem; }
+    .lang-switch { display: flex; border: 2px solid #ddd; border-radius: 6px; overflow: hidden; font-size: 0.82rem; font-weight: 600; }
+    .lang-switch button { padding: 5px 12px; border: none; background: #fff; cursor: pointer; color: #555; transition: all 0.2s; }
+    .lang-switch button.active { background: #4f7df9; color: #fff; }
+    .lang-switch button:not(.active):hover { background: #f0f3f8; }
+    .subtitle { color: #666; margin-bottom: 24px; font-size: 0.95rem; }
+    textarea { width: 100%; height: 220px; padding: 14px; border: 2px solid #ddd; border-radius: 8px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; resize: vertical; transition: border-color 0.2s; }
+    textarea:focus { outline: none; border-color: #4f7df9; }
+    .btn-validate { margin-top: 14px; padding: 12px 28px; background: #4f7df9; color: #fff; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+    .btn-validate:hover { background: #3a66d9; }
+    .btn-validate:active { background: #2c52b8; }
+    #results { margin-top: 24px; }
+    .summary { margin-bottom: 16px; padding: 12px 16px; border-radius: 8px; background: #fff; border: 1px solid #ddd; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    thead th { background: #f0f3f8; text-align: left; padding: 10px 14px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #555; border-bottom: 2px solid #ddd; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 0.88rem; vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr.row-valid { background: #f6fdf6; }
+    tbody tr.row-error { background: #fff8f8; }
+    td.email-cell { font-family: 'SF Mono', 'Fira Code', monospace; font-weight: 600; white-space: nowrap; }
+    td.status-cell { white-space: nowrap; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+    .badge-valid { background: #e8f5e9; color: #2e7d32; }
+    .badge-error { background: #ffeef0; color: #c62828; }
+    td.errors-cell { font-size: 0.84rem; color: #555; }
+    td.errors-cell ul { margin: 0; padding-left: 16px; }
+    td.errors-cell li { margin-bottom: 2px; }
+    td.suggestion-cell { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.84rem; color: #2e7d32; font-style: italic; }
+    td.line-cell { text-align: center; color: #888; font-size: 0.82rem; white-space: nowrap; }
+    .filter-check { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #555; cursor: pointer; user-select: none; white-space: nowrap; }
+    .filter-check input { accent-color: #4f7df9; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 id="title"></h1>
+      <div class="lang-switch">
+        <button onclick="setLang('en')" id="btn-en">EN</button>
+        <button onclick="setLang('fr')" id="btn-fr">FR</button>
+      </div>
+    </div>
+    <p class="subtitle" id="subtitle"></p>
+    <textarea id="emails" placeholder="alice@example.com&#10;bob@company;com&#10;charlie@domain.con"></textarea>
+    <button class="btn-validate" id="btn-validate" onclick="validate()"></button>
+    <div id="results"></div>
+  </div>
+
+  <script>
+    const I18N = {
+      en: {
+        title: 'Email Validator',
+        subtitle: 'Enter one email address per line, then click Validate.',
+        validate: 'Validate',
+        summary: (total, valid, errors) => `<strong>${total}</strong> email(s) checked &mdash; <span style="color:#2e7d32">${valid} valid</span>, <span style="color:#c62828">${errors} with issues</span>`,
+        thLine: 'Line',
+        thEmail: 'Email',
+        thStatus: 'Status',
+        thErrors: 'Detected errors',
+        thSuggestion: 'Suggested fix',
+        errorsOnly: 'Errors only',
+        badgeValid: 'Valid',
+        badgeError: 'Error',
+        // Error messages
+        whitespace: 'Contains whitespace characters',
+        semicolonDot: 'Contains ";" \u2014 likely meant "." (dot)',
+        colonDot: 'Contains ":" \u2014 likely meant "." (dot)',
+        commaDot: 'Contains "," \u2014 likely meant "." (dot)',
+        missingAt: 'Missing "@" symbol',
+        multipleAt: 'Multiple "@" symbols found',
+        missingLocal: 'Missing local part (before @)',
+        missingDomain: 'Missing domain (after @)',
+        localTooLong: 'Local part exceeds 64 characters',
+        localStartsDot: 'Local part starts with a dot',
+        localEndsDot: 'Local part ends with a dot',
+        localConsecDots: 'Local part contains consecutive dots',
+        localInvalidChars: 'Local part contains invalid characters',
+        domainMissingTld: 'Domain missing TLD (e.g., .com, .org)',
+        domainTrailingDot: 'Domain has trailing dot',
+        domainStartsDot: 'Domain starts with a dot',
+        domainConsecDots: 'Domain contains consecutive dots',
+        domainLabelHyphen: (label) => `Domain label "${label}" starts or ends with a hyphen`,
+        domainLabelInvalid: (label) => `Domain label "${label}" contains invalid characters`,
+        domainTypo: (from, to) => `"${from}" looks like a typo for "${to}"`,
+        tldTypo: (from, to) => `TLD ".${from}" looks like a typo for ".${to}"`,
+        tldTooShort: (tld) => `TLD ".${tld}" is too short \u2014 likely a typo`,
+        tldUnknown: (tld) => `TLD ".${tld}" is not a commonly recognized extension`,
+        domainUnderscore: 'Domain contains underscore \u2014 not allowed in domain names',
+        tldNumeric: 'TLD is numeric \u2014 likely a typo',
+      },
+      fr: {
+        title: 'Validateur d\u2019emails',
+        subtitle: 'Entrez une adresse email par ligne, puis cliquez sur Valider.',
+        validate: 'Valider',
+        summary: (total, valid, errors) => `<strong>${total}</strong> email(s) v\u00e9rifi\u00e9(s) &mdash; <span style="color:#2e7d32">${valid} valide(s)</span>, <span style="color:#c62828">${errors} avec erreur(s)</span>`,
+        thLine: 'Ligne',
+        thEmail: 'Email',
+        thStatus: 'Statut',
+        thErrors: 'Erreurs d\u00e9tect\u00e9es',
+        thSuggestion: 'Correction sugg\u00e9r\u00e9e',
+        errorsOnly: 'Erreurs uniquement',
+        badgeValid: 'Valide',
+        badgeError: 'Erreur',
+        // Error messages
+        whitespace: 'Contient des espaces',
+        semicolonDot: 'Contient ";" \u2014 probablement "." (point)',
+        colonDot: 'Contient ":" \u2014 probablement "." (point)',
+        commaDot: 'Contient "," \u2014 probablement "." (point)',
+        missingAt: 'Symbole "@" manquant',
+        multipleAt: 'Plusieurs symboles "@" trouv\u00e9s',
+        missingLocal: 'Partie locale manquante (avant @)',
+        missingDomain: 'Domaine manquant (apr\u00e8s @)',
+        localTooLong: 'La partie locale d\u00e9passe 64 caract\u00e8res',
+        localStartsDot: 'La partie locale commence par un point',
+        localEndsDot: 'La partie locale se termine par un point',
+        localConsecDots: 'La partie locale contient des points cons\u00e9cutifs',
+        localInvalidChars: 'La partie locale contient des caract\u00e8res invalides',
+        domainMissingTld: 'Extension du domaine manquante (ex : .com, .org)',
+        domainTrailingDot: 'Le domaine se termine par un point',
+        domainStartsDot: 'Le domaine commence par un point',
+        domainConsecDots: 'Le domaine contient des points cons\u00e9cutifs',
+        domainLabelHyphen: (label) => `Le label "${label}" commence ou se termine par un tiret`,
+        domainLabelInvalid: (label) => `Le label "${label}" contient des caract\u00e8res invalides`,
+        domainTypo: (from, to) => `"${from}" ressemble \u00e0 une faute de frappe pour "${to}"`,
+        tldTypo: (from, to) => `L\u2019extension ".${from}" ressemble \u00e0 une faute de frappe pour ".${to}"`,
+        tldTooShort: (tld) => `L\u2019extension ".${tld}" est trop courte \u2014 probablement une faute`,
+        tldUnknown: (tld) => `L\u2019extension ".${tld}" n\u2019est pas couramment reconnue`,
+        domainUnderscore: 'Le domaine contient un underscore \u2014 non autoris\u00e9 dans les noms de domaine',
+        tldNumeric: 'L\u2019extension est num\u00e9rique \u2014 probablement une faute',
+      },
+    };
+
+    let lang = 'en';
+    let errorsOnlyState = true;
+
+    function detectLang() {
+      const saved = localStorage.getItem('email-validator-lang');
+      if (saved && I18N[saved]) return saved;
+      const nav = (navigator.language || '').toLowerCase();
+      return nav.startsWith('fr') ? 'fr' : 'en';
+    }
+
+    function setLang(l) {
+      lang = l;
+      localStorage.setItem('email-validator-lang', lang);
+      document.documentElement.lang = lang;
+      applyLang();
+    }
+
+    function t(key) { return I18N[lang][key]; }
+
+    function applyLang() {
+      document.getElementById('title').textContent = t('title');
+      document.getElementById('subtitle').textContent = t('subtitle');
+      document.getElementById('btn-validate').textContent = t('validate');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      document.getElementById('btn-fr').classList.toggle('active', lang === 'fr');
+      document.title = t('title');
+      // Re-validate if results are showing
+      if (document.getElementById('results').innerHTML) validate();
+    }
+
+    const KNOWN_TLDS = [
+      'com','org','net','edu','gov','mil','int',
+      'io','co','us','uk','ca','au','de','fr','es','it','nl','be','ch','at',
+      'jp','cn','kr','in','br','mx','ru','za','nz','se','no','dk','fi','pl',
+      'pt','cz','ie','info','biz','name','pro','mobi','tel','asia','cat',
+      'jobs','travel','museum','aero','coop','app','dev','ai','me','tv','cc',
+      'tech','online','store','site','world','cloud','digital','email',
+      'company','agency','studio','design','media','group','team','zone',
+      'space','life','live','blog','shop','marketing','solutions','services',
+      'systems','network','software','support','academy','center','community',
+      'consulting','engineering','enterprises','foundation','institute',
+    ];
+
+    const TLD_TYPOS = {
+      'con': 'com', 'vom': 'com', 'cim': 'com', 'com,': 'com', 'comn': 'com', 'comm': 'com',
+      'ogr': 'org', 'prg': 'org', 'ort': 'org', 'org,': 'org',
+      'ner': 'net', 'met': 'net', 'net,': 'net', 'ney': 'net',
+      'eud': 'edu', 'edy': 'edu',
+      'gob': 'gov', 'giv': 'gov',
+      'oi': 'io', 'oo': 'io',
+      'nfo': 'info',
+      'fr ': 'fr', 'de ': 'de', 'uk ': 'uk',
+    };
+
+    const DOMAIN_TYPOS = {
+      'gmial.com': 'gmail.com', 'gmal.com': 'gmail.com', 'gmai.com': 'gmail.com',
+      'gamil.com': 'gmail.com', 'gmil.com': 'gmail.com', 'gnail.com': 'gmail.com',
+      'gmaill.com': 'gmail.com', 'gmail.co': 'gmail.com', 'gmail.om': 'gmail.com',
+      'gmail.con': 'gmail.com', 'gmaul.com': 'gmail.com', 'gmsil.com': 'gmail.com',
+      'hotmal.com': 'hotmail.com', 'hotmial.com': 'hotmail.com', 'hotmil.com': 'hotmail.com',
+      'hotmail.con': 'hotmail.com', 'hotmaill.com': 'hotmail.com',
+      'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'yahoo.con': 'yahoo.com',
+      'yahho.com': 'yahoo.com', 'yhaoo.com': 'yahoo.com',
+      'outloo.com': 'outlook.com', 'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com',
+      'iclod.com': 'icloud.com', 'icloud.con': 'icloud.com',
+    };
+
+    function validate() {
+      const raw = document.getElementById('emails').value.trim();
+      const resultsDiv = document.getElementById('results');
+      if (!raw) { resultsDiv.innerHTML = ''; return; }
+
+      const rawLines = raw.split('\n');
+      const lines = [];
+      for (let i = 0; i < rawLines.length; i++) {
+        const trimmed = rawLines[i].trim();
+        if (trimmed.length > 0) lines.push({ text: trimmed, lineNum: i + 1 });
+      }
+      const errorsOnly = errorsOnlyState;
+      let validCount = 0;
+      let errorCount = 0;
+      const rows = [];
+
+      for (const { text: line, lineNum } of lines) {
+        const { issues, suggestions } = checkEmail(line);
+        const hasErrors = issues.length > 0;
+        if (hasErrors) errorCount++; else validCount++;
+
+        if (errorsOnly && !hasErrors) continue;
+
+        const rowClass = hasErrors ? 'row-error' : 'row-valid';
+        const badge = hasErrors
+          ? `<span class="badge badge-error">${esc(t('badgeError'))}</span>`
+          : `<span class="badge badge-valid">${esc(t('badgeValid'))}</span>`;
+        const errorsHtml = hasErrors
+          ? '<ul>' + issues.map(i => `<li>${esc(i)}</li>`).join('') + '</ul>'
+          : '&mdash;';
+        const sugHtml = suggestions.length ? esc(suggestions[0]) : '&mdash;';
+
+        rows.push(`<tr class="${rowClass}">
+          <td class="line-cell">${lineNum}</td>
+          <td class="email-cell">${esc(line)}</td>
+          <td class="status-cell">${badge}</td>
+          <td class="errors-cell">${errorsHtml}</td>
+          <td class="suggestion-cell">${sugHtml}</td>
+        </tr>`);
+      }
+
+      const checked = errorsOnly ? 'checked' : '';
+      const summary = `<div class="summary"><span>${I18N[lang].summary(lines.length, validCount, errorCount)}</span><label class="filter-check"><input type="checkbox" ${checked} onchange="errorsOnlyState=this.checked;validate()"><span>${esc(t('errorsOnly'))}</span></label></div>`;
+      const table = `<table><thead><tr><th>${esc(t('thLine'))}</th><th>${esc(t('thEmail'))}</th><th>${esc(t('thStatus'))}</th><th>${esc(t('thErrors'))}</th><th>${esc(t('thSuggestion'))}</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+      resultsDiv.innerHTML = summary + table;
+    }
+
+    function checkEmail(email) {
+      const issues = [];
+      const suggestions = [];
+      let fixed = email;
+
+      if (/\s/.test(email)) {
+        issues.push(t('whitespace'));
+        fixed = fixed.replace(/\s/g, '');
+      }
+
+      if (email.includes(';')) {
+        issues.push(t('semicolonDot'));
+        fixed = fixed.replace(/;/g, '.');
+      }
+      if (email.includes(':')) {
+        issues.push(t('colonDot'));
+        fixed = fixed.replace(/:/g, '.');
+      }
+
+      if (email.includes(',')) {
+        issues.push(t('commaDot'));
+        fixed = fixed.replace(/,/g, '.');
+      }
+
+      if (!fixed.includes('@')) {
+        issues.push(t('missingAt'));
+        return { issues, suggestions };
+      }
+
+      const atCount = (fixed.match(/@/g) || []).length;
+      if (atCount > 1) {
+        issues.push(t('multipleAt'));
+        return { issues, suggestions };
+      }
+
+      const [local, domain] = fixed.split('@');
+
+      if (!local) {
+        issues.push(t('missingLocal'));
+      }
+
+      if (!domain) {
+        issues.push(t('missingDomain'));
+        return { issues, suggestions };
+      }
+
+      if (local) {
+        if (local.length > 64) issues.push(t('localTooLong'));
+        if (/^\./.test(local)) issues.push(t('localStartsDot'));
+        if (/\.$/.test(local)) issues.push(t('localEndsDot'));
+        if (/\.\./.test(local)) issues.push(t('localConsecDots'));
+        if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local)) {
+          issues.push(t('localInvalidChars'));
+        }
+      }
+
+      if (domain) {
+        let domainFixed = domain.toLowerCase();
+
+        if (!domainFixed.includes('.')) {
+          issues.push(t('domainMissingTld'));
+          return { issues, suggestions };
+        }
+
+        if (domainFixed.endsWith('.')) {
+          issues.push(t('domainTrailingDot'));
+          domainFixed = domainFixed.replace(/\.+$/, '');
+        }
+
+        if (domainFixed.startsWith('.')) {
+          issues.push(t('domainStartsDot'));
+        }
+
+        if (/\.\./.test(domainFixed)) {
+          issues.push(t('domainConsecDots'));
+          domainFixed = domainFixed.replace(/\.{2,}/g, '.');
+        }
+
+        const labels = domainFixed.split('.');
+        for (const label of labels) {
+          if (label.startsWith('-') || label.endsWith('-')) {
+            issues.push(I18N[lang].domainLabelHyphen(label));
+          }
+          if (label.length === 0) continue;
+          if (!/^[a-z0-9-]+$/.test(label)) {
+            issues.push(I18N[lang].domainLabelInvalid(label));
+          }
+        }
+
+        if (DOMAIN_TYPOS[domainFixed]) {
+          issues.push(I18N[lang].domainTypo(domainFixed, DOMAIN_TYPOS[domainFixed]));
+          suggestions.push(`${local}@${DOMAIN_TYPOS[domainFixed]}`);
+          return { issues, suggestions };
+        }
+
+        const tld = labels[labels.length - 1];
+
+        if (TLD_TYPOS[tld]) {
+          issues.push(I18N[lang].tldTypo(tld, TLD_TYPOS[tld]));
+          const correctedDomain = labels.slice(0, -1).concat(TLD_TYPOS[tld]).join('.');
+          suggestions.push(`${local}@${correctedDomain}`);
+        } else if (tld.length === 1) {
+          issues.push(I18N[lang].tldTooShort(tld));
+        } else if (!KNOWN_TLDS.includes(tld) && tld.length <= 4) {
+          issues.push(I18N[lang].tldUnknown(tld));
+        }
+
+        if (domain.includes('_')) {
+          issues.push(t('domainUnderscore'));
+        }
+
+        if (/^\d+$/.test(tld)) {
+          issues.push(t('tldNumeric'));
+        }
+      }
+
+      if (suggestions.length === 0 && issues.length > 0 && local && domain) {
+        let sugDomain = domain.toLowerCase().replace(/;/g, '.').replace(/:/g, '.').replace(/,/g, '.').replace(/\.{2,}/g, '.').replace(/\.+$/, '');
+        if (DOMAIN_TYPOS[sugDomain]) sugDomain = DOMAIN_TYPOS[sugDomain];
+        const sugLabels = sugDomain.split('.');
+        const sugTld = sugLabels[sugLabels.length - 1];
+        if (TLD_TYPOS[sugTld]) sugLabels[sugLabels.length - 1] = TLD_TYPOS[sugTld];
+        const suggestion = `${local.replace(/\s/g, '')}@${sugLabels.join('.')}`;
+        if (suggestion !== email.trim()) suggestions.push(suggestion);
+      }
+
+      return { issues, suggestions };
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    document.getElementById('emails').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) validate();
+    });
+
+    // Init language
+    lang = detectLang();
+    applyLang();
+  </script>
+</body>
+</html>
