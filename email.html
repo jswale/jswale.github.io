@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,7 +53,9 @@
       </div>
     </div>
     <p class="subtitle" id="subtitle"></p>
-    <textarea id="emails" placeholder="alice@example.com&#10;bob@company;com&#10;charlie@domain.con"></textarea>
+    <textarea id="emails">alice@example.com
+bob@company;com
+charlie@domain.con</textarea>
     <button class="btn-validate" id="btn-validate" onclick="validate()"></button>
     <div id="results"></div>
   </div>
@@ -70,6 +73,7 @@
         thErrors: 'Detected errors',
         thSuggestion: 'Suggested fix',
         errorsOnly: 'Errors only',
+        noErrors: 'All emails are valid!',
         badgeValid: 'Valid',
         badgeError: 'Error',
         // Error messages
@@ -110,6 +114,7 @@
         thErrors: 'Erreurs d\u00e9tect\u00e9es',
         thSuggestion: 'Correction sugg\u00e9r\u00e9e',
         errorsOnly: 'Erreurs uniquement',
+        noErrors: 'Tous les emails sont valides !',
         badgeValid: 'Valide',
         badgeError: 'Erreur',
         // Error messages
@@ -251,7 +256,12 @@
 
       const checked = errorsOnly ? 'checked' : '';
       const summary = `<div class="summary"><span>${I18N[lang].summary(lines.length, validCount, errorCount)}</span><label class="filter-check"><input type="checkbox" ${checked} onchange="errorsOnlyState=this.checked;validate()"><span>${esc(t('errorsOnly'))}</span></label></div>`;
-      const table = `<table><thead><tr><th>${esc(t('thLine'))}</th><th>${esc(t('thEmail'))}</th><th>${esc(t('thStatus'))}</th><th>${esc(t('thErrors'))}</th><th>${esc(t('thSuggestion'))}</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+      let table = '';
+      if (rows.length > 0) {
+        table = `<table><thead><tr><th>${esc(t('thLine'))}</th><th>${esc(t('thEmail'))}</th><th>${esc(t('thStatus'))}</th><th>${esc(t('thErrors'))}</th><th>${esc(t('thSuggestion'))}</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+      } else if (errorsOnly && errorCount === 0) {
+        table = `<p style="text-align:center;color:#2e7d32;margin-top:12px;font-size:0.95rem;">${esc(t('noErrors'))}</p>`;
+      }
       resultsDiv.innerHTML = summary + table;
     }
 
