@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kingshot Alliance Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  canvas {
+    display: block;
+    cursor: grab;
+  }
+  canvas.dragging { cursor: grabbing; }
+
+  #ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+  }
+
+  #alliance-header {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 40, 0.9);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 8px 24px;
+    pointer-events: auto;
+    text-align: center;
+  }
+  #alliance-header h1 {
+    font-size: 18px;
+    color: #ffd700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  #alliance-header .subtitle {
+    font-size: 12px;
+    color: #8888aa;
+    margin-top: 2px;
+  }
+
+  #legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(20, 20, 40, 0.9);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    pointer-events: auto;
+    font-size: 12px;
+  }
+  #legend h3 {
+    font-size: 13px;
+    color: #ffd700;
+    margin-bottom: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  #info-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(20, 20, 40, 0.95);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 16px;
+    pointer-events: auto;
+    min-width: 200px;
+    display: none;
+  }
+  #info-panel h3 {
+    font-size: 14px;
+    color: #ffd700;
+    margin-bottom: 8px;
+  }
+  #info-panel .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  #info-panel .info-label { color: #8888aa; }
+  #info-panel .info-value { color: #e0e0e0; font-weight: 600; }
+  #info-panel .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    color: #8888aa;
+    font-size: 16px;
+  }
+  #info-panel .close-btn:hover { color: #fff; }
+
+  #info-panel .action-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  #info-panel .remove-btn {
+    background: #c0392b;
+    color: #fff;
+  }
+  #info-panel .remove-btn:hover { background: #e74c3c; }
+  #info-panel .set-coord-btn {
+    background: #2980b9;
+    color: #fff;
+  }
+  #info-panel .set-coord-btn:hover { background: #3498db; }
+
+  #set-coord-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(20, 20, 40, 0.95);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 16px;
+    pointer-events: auto;
+    min-width: 200px;
+    display: none;
+  }
+  #set-coord-panel h3 {
+    font-size: 14px;
+    color: #ffd700;
+    margin-bottom: 8px;
+  }
+  #set-coord-panel .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    color: #8888aa;
+    font-size: 16px;
+  }
+  #set-coord-panel .close-btn:hover { color: #fff; }
+  #set-coord-panel label {
+    display: block;
+    font-size: 12px;
+    color: #8888aa;
+    margin-top: 8px;
+    margin-bottom: 2px;
+  }
+  #set-coord-panel input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-size: 13px;
+  }
+  #set-coord-panel .submit-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    background: #27ae60;
+    color: #fff;
+  }
+  #set-coord-panel .submit-btn:hover { background: #2ecc71; }
+  #set-coord-panel .coord-hint {
+    font-size: 11px;
+    color: #6a6a8a;
+    margin-top: 4px;
+  }
+
+  #add-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(20, 20, 40, 0.95);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 16px;
+    pointer-events: auto;
+    min-width: 220px;
+    display: none;
+  }
+  #add-panel h3 {
+    font-size: 14px;
+    color: #ffd700;
+    margin-bottom: 10px;
+  }
+  #add-panel .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    color: #8888aa;
+    font-size: 16px;
+  }
+  #add-panel .close-btn:hover { color: #fff; }
+  #add-panel label {
+    display: block;
+    font-size: 12px;
+    color: #8888aa;
+    margin-bottom: 3px;
+    margin-top: 8px;
+  }
+  #add-panel input, #add-panel select {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-size: 13px;
+  }
+  #add-panel .submit-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 7px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    background: #27ae60;
+    color: #fff;
+  }
+  #add-panel .submit-btn:hover { background: #2ecc71; }
+  #add-panel .set-coord-btn {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    background: #2980b9;
+    color: #fff;
+  }
+  #add-panel .set-coord-btn:hover { background: #3498db; }
+
+  #expand-panel {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 40, 0.9);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8888aa;
+  }
+  #expand-panel span.label { white-space: nowrap; }
+  .expand-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .expand-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; color: #ffd700; }
+  #grid-size { color: #ffd700; font-weight: 600; margin: 0 4px; }
+
+  #io-panel {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .io-btn {
+    background: rgba(20, 20, 40, 0.9);
+    border: 1px solid #4a4a6a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .io-btn:hover { background: rgba(40, 40, 80, 0.95); border-color: #ffd700; color: #ffd700; }
+
+  #controls-hint {
+    position: absolute;
+    bottom: 56px;
+    right: 16px;
+    background: rgba(20, 20, 40, 0.9);
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #8888aa;
+    pointer-events: auto;
+  }
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+
+<div id="ui-overlay">
+  <div id="alliance-header">
+    <h1>Kingshot Alliance</h1>
+    <div class="subtitle" id="member-count"></div>
+  </div>
+
+  <div id="legend">
+    <h3>Buildings</h3>
+    <div id="legend-items"></div>
+  </div>
+
+  <div id="info-panel">
+    <span class="close-btn" onclick="closeInfoPanel()">&times;</span>
+    <h3 id="info-title"></h3>
+    <div id="info-content"></div>
+  </div>
+
+  <div id="set-coord-panel">
+    <span class="close-btn" onclick="closeSetCoordPanel()">&times;</span>
+    <h3>Set Coordinates</h3>
+    <div id="set-coord-info"></div>
+    <label>X</label>
+    <input type="number" id="set-coord-x">
+    <label>Y</label>
+    <input type="number" id="set-coord-y">
+    <div class="coord-hint">All tile coordinates will update relative to this reference.</div>
+    <button class="submit-btn" onclick="submitSetCoord()">Apply</button>
+  </div>
+
+  <div id="add-panel">
+    <span class="close-btn" onclick="closeAddPanel()">&times;</span>
+    <h3>Add Member</h3>
+    <div id="add-position"></div>
+    <label>Player Name</label>
+    <input type="text" id="add-name" placeholder="Enter name...">
+    <label>Building</label>
+    <select id="add-building" onchange="toggleLevelField()"></select>
+    <div id="add-level-group">
+      <label>Level</label>
+      <select id="add-level"></select>
+    </div>
+    <button class="submit-btn" onclick="submitAddMember()">Place Building</button>
+    <button class="action-btn set-coord-btn" onclick="showSetCoordFromAdd()">Set Coordinates</button>
+  </div>
+
+  <div id="expand-panel">
+    <span class="label">Expand:</span>
+    <button class="expand-btn" onclick="expandGrid('top')">&#9650; Top</button>
+    <button class="expand-btn" onclick="expandGrid('bottom')">&#9660; Bottom</button>
+    <button class="expand-btn" onclick="expandGrid('left')">&#9664; Left</button>
+    <button class="expand-btn" onclick="expandGrid('right')">&#9654; Right</button>
+    <span id="grid-size"></span>
+  </div>
+
+  <div id="io-panel">
+    <button class="io-btn" onclick="exportData()">Export</button>
+    <button class="io-btn" onclick="document.getElementById('import-file').click()">Import</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+
+  <div id="controls-hint">
+    Drag to pan &middot; Scroll to zoom &middot; Click tile for info
+  </div>
+</div>
+
+<script>
+// ─── Configuration ───────────────────────────────────────────────────
+let GRID_COLS = 24;
+let GRID_ROWS = 24;
+const TILE_W = 80;
+const TILE_H = 56;
+const EXPAND_AMOUNT = 4;
+let coordOffset = { col: 0, row: 0 };
+
+// ─── Building Types (4 types with multi-tile footprints) ─────────────
+const BUILDING_TYPES = {
+  player:      { label: 'Player',      color: '#2980b9', roofColor: '#3498db', height: 18, size: 2 },
+  bear_trap:   { label: 'Bear Trap',   color: '#c0392b', roofColor: '#e74c3c', height: 14, size: 3 },
+  headquarter: { label: 'Head Quarter', color: '#d4a017', roofColor: '#f1c40f', height: 26, size: 3 },
+  building:    { label: 'Other Building', color: '#8e44ad', roofColor: '#9b59b6', height: 16, size: 2 },
+};
+
+// ─── Sample Alliance Data ────────────────────────────────────────────
+const PLAYER_NAMES = [
+  'DragonLord','ShadowKnight','IronWolf','StormBreaker','FrostBite',
+  'BlazeFury','NightHawk','ThunderGod','SilverFang','DarkPhoenix',
+  'GoldRush','CrimsonKing','VoidWalker','SteelHeart','RuneMaster',
+  'BoneReaper','FlameWarden','IceQueen','WindRunner','EarthShaker',
+  'StarDust','MoonRider','SunChaser','DeathBringer','LifeKeeper',
+  'SoulHunter','BloodRaven','GhostRider','StoneGuard','WildFire',
+  'OceanDeep','SkyFall','WarHammer','SpellCaster','BladeDancer',
+  'ArrowSmith','ShieldMaiden','BeastTamer','PlagueDoctor','HolyKnight',
+  'DarkMage','LightBringer','SerpentKing','WolfPack','HawkEye',
+  'TigerClaw','BearCub','FoxTrot','ViperStrike','CobraKai',
+  'LionHeart','EagleScout','RavenClaw','PantherProwl','FalconWing',
+  'DragonScale','PhoenixRise','GriffinRider','UnicornDust','KrakenDeep'
+];
+
+const BUILDING_KEYS = Object.keys(BUILDING_TYPES);
+
+// ─── Levels ─────────────────────────────────────────────────────────
+const LEVELS = [];
+for (let i = 1; i <= 30; i++) LEVELS.push(String(i));
+for (let i = 1; i <= 5; i++) LEVELS.push('T' + i);
+
+// ─── Display coordinates (with offset) ──────────────────────────────
+function displayCol(col) { return col + coordOffset.col; }
+function displayRow(row) { return row + coordOffset.row; }
+function displayCoords(col, row) { return `(${displayCol(col)}, ${displayRow(row)})`; }
+
+// ─── Grid helpers (multi-tile) ───────────────────────────────────────
+// grid[row][col] stores the member object for every tile it occupies.
+// member.plot is the top-left anchor tile.
+let grid = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(null));
+
+function canPlace(col, row, size) {
+  if (col + size > GRID_COLS || row + size > GRID_ROWS) return false;
+  for (let r = row; r < row + size; r++)
+    for (let c = col; c < col + size; c++)
+      if (grid[r][c] !== null) return false;
+  return true;
+}
+
+function placeOnGrid(member) {
+  const s = BUILDING_TYPES[member.building].size;
+  const { col, row } = member.plot;
+  for (let r = row; r < row + s; r++)
+    for (let c = col; c < col + s; c++)
+      grid[r][c] = member;
+}
+
+function removeFromGrid(member) {
+  const s = BUILDING_TYPES[member.building].size;
+  const { col, row } = member.plot;
+  for (let r = row; r < row + s; r++)
+    for (let c = col; c < col + s; c++)
+      grid[r][c] = null;
+}
+
+// ─── Generate sample data ────────────────────────────────────────────
+const alliance = { name: 'Kingshot', members: [] };
+
+function generateAllianceData() {
+  // Leader HQ at center
+  const hqCol = 10, hqRow = 10;
+  const leader = { name: 'DragonLord', plot: { col: hqCol, row: hqRow }, building: 'headquarter' };
+  alliance.members.push(leader);
+  placeOnGrid(leader);
+
+  // Officers with HQs near center
+  const officers = ['ShadowKnight', 'IronWolf', 'StormBreaker', 'FrostBite'];
+  const offPlots = [{col:7,row:10},{col:10,row:7},{col:13,row:10},{col:10,row:13}];
+  officers.forEach((name, i) => {
+    const m = { name, plot: offPlots[i], building: 'headquarter' };
+    if (canPlace(m.plot.col, m.plot.row, 3)) {
+      alliance.members.push(m);
+      placeOnGrid(m);
+    }
+  });
+
+  // Fill remaining members randomly
+  for (let i = 5; i < PLAYER_NAMES.length; i++) {
+    const building = BUILDING_KEYS[Math.floor(Math.random() * BUILDING_KEYS.length)];
+    const size = BUILDING_TYPES[building].size;
+    const level = building === 'player' ? LEVELS[4 + Math.floor(Math.random() * (LEVELS.length - 4))] : null;
+    let placed = false;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const col = Math.floor(Math.random() * (GRID_COLS - size + 1));
+      const row = Math.floor(Math.random() * (GRID_ROWS - size + 1));
+      if (canPlace(col, row, size)) {
+        const m = { name: PLAYER_NAMES[i], plot: { col, row }, building };
+        if (level) m.level = level;
+        alliance.members.push(m);
+        placeOnGrid(m);
+        placed = true;
+        break;
+      }
+    }
+  }
+}
+// generateAllianceData();
+
+// ─── Canvas Setup ────────────────────────────────────────────────────
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+
+let width, height;
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', () => { resize(); render(); });
+
+// ─── Camera ──────────────────────────────────────────────────────────
+const camera = {
+  x: 0,
+  y: 0,
+  zoom: 0.9,
+};
+
+// Center the map initially
+function centerCamera() {
+  // Center of the grid in world coordinates
+  const centerCol = (GRID_COLS - 1) / 2;
+  const centerRow = (GRID_ROWS - 1) / 2;
+  const worldX = (centerCol - centerRow) * (TILE_W / 2);
+  const worldY = (centerCol + centerRow) * (TILE_H / 2);
+  camera.x = width / 2 - worldX * camera.zoom;
+  camera.y = height / 2 - worldY * camera.zoom;
+}
+
+// ─── Isometric Projection ────────────────────────────────────────────
+function gridToScreen(col, row) {
+  const x = (col - row) * (TILE_W / 2);
+  const y = (col + row) * (TILE_H / 2);
+  return {
+    x: x * camera.zoom + camera.x,
+    y: y * camera.zoom + camera.y
+  };
+}
+
+function screenToGrid(sx, sy) {
+  const wx = (sx - camera.x) / camera.zoom;
+  const wy = (sy - camera.y) / camera.zoom;
+  const col = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
+  const row = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
+  return { col: Math.floor(col), row: Math.floor(row) };
+}
+
+// ─── Drawing Functions ───────────────────────────────────────────────
+function drawTile(col, row, fillColor, strokeColor) {
+  const { x, y } = gridToScreen(col, row);
+  const hw = (TILE_W / 2) * camera.zoom;
+  const hh = (TILE_H / 2) * camera.zoom;
+
+  ctx.beginPath();
+  ctx.moveTo(x, y - hh);
+  ctx.lineTo(x + hw, y);
+  ctx.lineTo(x, y + hh);
+  ctx.lineTo(x - hw, y);
+  ctx.closePath();
+
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawBuildingBorder(member) {
+  const bt = BUILDING_TYPES[member.building];
+  const s = bt.size;
+  const z = camera.zoom;
+
+  // Outer diamond around the full footprint
+  const centerCol = member.plot.col + (s - 1) / 2;
+  const centerRow = member.plot.row + (s - 1) / 2;
+  const { x: cx, y: cy } = gridToScreen(centerCol, centerRow);
+  const hw = (TILE_W / 2) * s * z;
+  const hh = (TILE_H / 2) * s * z;
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - hh);
+  ctx.lineTo(cx + hw, cy);
+  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx - hw, cy);
+  ctx.closePath();
+  ctx.strokeStyle = darken(bt.color, 0.5);
+  ctx.lineWidth = 2.5 * z;
+  ctx.stroke();
+}
+
+function drawBuildingLabel(member) {
+  const bt = BUILDING_TYPES[member.building];
+  const s = bt.size;
+  const z = camera.zoom;
+
+  // Center of the multi-tile footprint
+  const centerCol = member.plot.col + (s - 1) / 2;
+  const centerRow = member.plot.row + (s - 1) / 2;
+  const { x: cx, y: cy } = gridToScreen(centerCol, centerRow);
+
+  const isPlayer = member.building === 'player';
+  const isT = isPlayer && String(member.level).startsWith('T');
+  const label = isT ? member.name + ' \u{1F451}' : member.name;
+
+  let yOff = 0;
+  // Player name (+ crown for T-levels)
+  ctx.font = `bold ${Math.max(8, 11 * z)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillText(label, cx + 1, cy - 6 * z + 1);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, cx, cy - 6 * z);
+  yOff += 10 * z;
+
+  // Level for players
+  if (isPlayer && member.level) {
+    const lvText = String(member.level).startsWith('T') ? member.level : 'Lv.' + member.level;
+    ctx.font = `${Math.max(7, 9 * z)}px sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(lvText, cx, cy - 6 * z + yOff);
+    yOff += 10 * z;
+  }
+
+  // Coordinates
+  ctx.font = `${Math.max(6, 8 * z)}px sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText(displayCoords(member.plot.col, member.plot.row), cx, cy - 6 * z + yOff);
+}
+
+function darken(hex, amount) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, ((num >> 16) & 0xff) * (1 - amount));
+  const g = Math.max(0, ((num >> 8) & 0xff) * (1 - amount));
+  const b = Math.max(0, (num & 0xff) * (1 - amount));
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+function lighten(hex, amount) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((num >> 16) & 0xff) + (255 - ((num >> 16) & 0xff)) * amount);
+  const g = Math.min(255, ((num >> 8) & 0xff) + (255 - ((num >> 8) & 0xff)) * amount);
+  const b = Math.min(255, (num & 0xff) + (255 - (num & 0xff)) * amount);
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+// ─── Move Arrows ─────────────────────────────────────────────────────
+function getMoveArrowPositions(member) {
+  const bt = BUILDING_TYPES[member.building];
+  const s = bt.size;
+  const z = camera.zoom;
+  const centerCol = member.plot.col + (s - 1) / 2;
+  const centerRow = member.plot.row + (s - 1) / 2;
+  const offset = (s / 2 + 0.8);
+  const r = 12 * z;
+  return [
+    { dir: 'top',    ...gridToScreen(centerCol, centerRow - offset), label: '\u25B2', dc: 0, dr: -1, r },
+    { dir: 'bottom', ...gridToScreen(centerCol, centerRow + offset), label: '\u25BC', dc: 0, dr: 1, r },
+    { dir: 'left',   ...gridToScreen(centerCol - offset, centerRow), label: '\u25C0', dc: -1, dr: 0, r },
+    { dir: 'right',  ...gridToScreen(centerCol + offset, centerRow), label: '\u25B6', dc: 1, dr: 0, r },
+  ];
+}
+
+function drawMoveArrows(member) {
+  const arrows = getMoveArrowPositions(member);
+  const z = camera.zoom;
+  arrows.forEach(a => {
+    // Check if move is possible
+    const newCol = member.plot.col + a.dc;
+    const newRow = member.plot.row + a.dr;
+    const s = BUILDING_TYPES[member.building].size;
+    // Temporarily remove from grid to check placement
+    removeFromGrid(member);
+    const possible = canPlace(newCol, newRow, s);
+    placeOnGrid(member);
+
+    // Draw circle
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+    ctx.fillStyle = possible ? 'rgba(39, 174, 96, 0.8)' : 'rgba(100, 100, 100, 0.4)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Draw arrow symbol
+    ctx.font = `bold ${Math.max(8, 11 * z)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = possible ? '#fff' : 'rgba(255,255,255,0.4)';
+    ctx.fillText(a.label, a.x, a.y);
+  });
+}
+
+function moveMember(member, dc, dr) {
+  const s = BUILDING_TYPES[member.building].size;
+  const newCol = member.plot.col + dc;
+  const newRow = member.plot.row + dr;
+  removeFromGrid(member);
+  if (!canPlace(newCol, newRow, s)) {
+    placeOnGrid(member);
+    return;
+  }
+  member.plot.col = newCol;
+  member.plot.row = newRow;
+  placeOnGrid(member);
+  selectedTile = { col: newCol, row: newRow };
+  showInfoPanel(member);
+  render();
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────
+let hoveredTile = null;
+let selectedTile = null;
+
+function getMemberAt(col, row) {
+  if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return null;
+  return grid[row][col];
+}
+
+function render() {
+  ctx.clearRect(0, 0, width, height);
+
+  // Draw background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(1, '#16213e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Determine which member is hovered/selected
+  const hoveredMember = hoveredTile ? getMemberAt(hoveredTile.col, hoveredTile.row) : null;
+  const selectedMember = selectedTile ? getMemberAt(selectedTile.col, selectedTile.row) : null;
+
+  // Track which buildings have been drawn (draw once per member)
+  const drawnMembers = new Set();
+
+  // Draw tiles back-to-front (painter's algorithm)
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      const member = grid[row][col];
+
+      let tileColor = '#2d5a1e';
+      let strokeColor = '#3a7a28';
+
+      if ((col + row) % 2 === 0) {
+        tileColor = '#2a5219';
+        strokeColor = '#357022';
+      }
+
+      // Occupied tiles get the building color
+      if (member) {
+        const bt = BUILDING_TYPES[member.building];
+        tileColor = bt.color;
+        strokeColor = darken(bt.color, 0.3);
+      }
+
+      // Highlight for hovered/selected building
+      if (member && member === selectedMember) {
+        tileColor = lighten(BUILDING_TYPES[member.building].color, 0.3);
+        strokeColor = '#ffd700';
+      } else if (member && member === hoveredMember) {
+        tileColor = lighten(BUILDING_TYPES[member.building].color, 0.15);
+        strokeColor = '#ffffff';
+      } else if (!member && hoveredTile && hoveredTile.col === col && hoveredTile.row === row) {
+        tileColor = '#3a7a2a';
+        strokeColor = '#88cc66';
+      }
+
+      drawTile(col, row, tileColor, strokeColor);
+    }
+  }
+
+  // Draw building borders (outline around full footprint)
+  alliance.members.forEach(m => drawBuildingBorder(m));
+
+  // Draw labels on top of tiles (second pass so text is never obscured)
+  alliance.members.forEach(m => drawBuildingLabel(m));
+
+  // Draw move arrows around selected building
+  if (selectedMember) {
+    drawMoveArrows(selectedMember);
+  }
+
+  // Draw coordinates on empty tiles
+  const z = camera.zoom;
+  if (z > 0.4) {
+    ctx.font = `${Math.max(6, 8 * z)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        if (!grid[row][col]) {
+          const { x, y } = gridToScreen(col, row);
+          ctx.fillText(displayCoords(col, row), x, y);
+        }
+      }
+    }
+  }
+}
+
+// ─── Interaction: Pan ────────────────────────────────────────────────
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let cameraStart = { x: 0, y: 0 };
+
+canvas.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  cameraStart = { x: camera.x, y: camera.y };
+  canvas.classList.add('dragging');
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    camera.x = cameraStart.x + (e.clientX - dragStart.x);
+    camera.y = cameraStart.y + (e.clientY - dragStart.y);
+    render();
+    return;
+  }
+
+  const g = screenToGrid(e.clientX, e.clientY);
+  if (g.col >= 0 && g.col < GRID_COLS && g.row >= 0 && g.row < GRID_ROWS) {
+    hoveredTile = g;
+    canvas.style.cursor = 'pointer';
+  } else {
+    hoveredTile = null;
+    canvas.style.cursor = 'grab';
+  }
+  render();
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  const wasDrag = Math.abs(e.clientX - dragStart.x) > 3 || Math.abs(e.clientY - dragStart.y) > 3;
+  isDragging = false;
+  canvas.classList.remove('dragging');
+
+  if (!wasDrag) {
+    // Check if clicking a move arrow
+    if (selectedTile) {
+      const selMember = getMemberAt(selectedTile.col, selectedTile.row);
+      if (selMember) {
+        const arrows = getMoveArrowPositions(selMember);
+        for (const a of arrows) {
+          const dx = e.clientX - a.x, dy = e.clientY - a.y;
+          if (dx * dx + dy * dy <= a.r * a.r) {
+            moveMember(selMember, a.dc, a.dr);
+            return;
+          }
+        }
+      }
+    }
+
+    const g = screenToGrid(e.clientX, e.clientY);
+    if (g.col >= 0 && g.col < GRID_COLS && g.row >= 0 && g.row < GRID_ROWS) {
+      const member = grid[g.row][g.col];
+      if (member) {
+        selectedTile = { col: member.plot.col, row: member.plot.row };
+        closeAddPanel();
+        showInfoPanel(member);
+      } else {
+        selectedTile = g;
+        closeInfoPanel();
+        showAddPanel(g.col, g.row);
+      }
+    } else {
+      selectedTile = null;
+      closeInfoPanel();
+      closeAddPanel();
+    }
+    render();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  isDragging = false;
+  hoveredTile = null;
+  canvas.classList.remove('dragging');
+  render();
+});
+
+// ─── Interaction: Zoom ───────────────────────────────────────────────
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+  const newZoom = Math.max(0.3, Math.min(3, camera.zoom * zoomFactor));
+
+  // Zoom toward cursor position
+  const mx = e.clientX;
+  const my = e.clientY;
+  camera.x = mx - (mx - camera.x) * (newZoom / camera.zoom);
+  camera.y = my - (my - camera.y) * (newZoom / camera.zoom);
+  camera.zoom = newZoom;
+
+  render();
+}, { passive: false });
+
+// ─── Touch support ───────────────────────────────────────────────────
+let lastTouchDist = 0;
+let lastTouchCenter = { x: 0, y: 0 };
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    cameraStart = { x: camera.x, y: camera.y };
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dy = e.touches[1].clientY - e.touches[0].clientY;
+    lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+    lastTouchCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 1 && isDragging) {
+    camera.x = cameraStart.x + (e.touches[0].clientX - dragStart.x);
+    camera.y = cameraStart.y + (e.touches[0].clientY - dragStart.y);
+    render();
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dy = e.touches[1].clientY - e.touches[0].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const center = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+
+    const scale = dist / lastTouchDist;
+    const newZoom = Math.max(0.3, Math.min(3, camera.zoom * scale));
+    camera.x = center.x - (center.x - camera.x) * (newZoom / camera.zoom);
+    camera.y = center.y - (center.y - camera.y) * (newZoom / camera.zoom);
+    camera.zoom = newZoom;
+
+    lastTouchDist = dist;
+    lastTouchCenter = center;
+    render();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0 && isDragging) {
+    isDragging = false;
+  }
+});
+
+// ─── Info Panel ──────────────────────────────────────────────────────
+function showInfoPanel(member) {
+  const panel = document.getElementById('info-panel');
+  const bt = BUILDING_TYPES[member.building];
+  document.getElementById('info-title').textContent = member.name;
+  document.getElementById('info-content').innerHTML = `
+    <div class="info-row"><span class="info-label">Building</span><span class="info-value">${bt.label} (${bt.size}x${bt.size})</span></div>
+    ${member.building === 'player' ? `<div class="info-row"><span class="info-label">Level</span><span class="info-value">${member.level}</span></div>` : ''}
+    <div class="info-row"><span class="info-label">Position</span><span class="info-value">${displayCoords(member.plot.col, member.plot.row)}</span></div>
+    <button class="action-btn set-coord-btn" onclick="showSetCoordPanel(${member.plot.col}, ${member.plot.row})">Set Coordinates</button>
+    <button class="action-btn remove-btn" onclick="removeMember(${member.plot.col}, ${member.plot.row})">Remove</button>
+  `;
+  panel.style.display = 'block';
+}
+
+function closeInfoPanel() {
+  document.getElementById('info-panel').style.display = 'none';
+}
+
+// ─── Remove Member ───────────────────────────────────────────────────
+function removeMember(col, row) {
+  const member = grid[row][col];
+  if (!member) return;
+  removeFromGrid(member);
+  const idx = alliance.members.indexOf(member);
+  if (idx !== -1) alliance.members.splice(idx, 1);
+  selectedTile = null;
+  closeInfoPanel();
+  updateMemberCount();
+  render();
+}
+
+// ─── Add Panel ───────────────────────────────────────────────────────
+let addPanelTarget = null;
+
+function toggleLevelField() {
+  const building = document.getElementById('add-building').value;
+  document.getElementById('add-level-group').style.display = building === 'player' ? '' : 'none';
+}
+
+function showAddPanel(col, row) {
+  addPanelTarget = { col, row };
+  const panel = document.getElementById('add-panel');
+  document.getElementById('add-position').innerHTML =
+    `<div style="font-size:12px;color:#8888aa;margin-bottom:4px">Tile ${displayCoords(col, row)}</div>`;
+  document.getElementById('add-name').value = '';
+  const levelSel = document.getElementById('add-level');
+  if (levelSel.options.length === 0) {
+    LEVELS.forEach(lv => {
+      const opt = document.createElement('option');
+      opt.value = lv;
+      opt.textContent = lv;
+      levelSel.appendChild(opt);
+    });
+  }
+  levelSel.value = '30';
+  const sel = document.getElementById('add-building');
+  if (sel.options.length === 0) {
+    for (const [key, bt] of Object.entries(BUILDING_TYPES)) {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = `${bt.label} (${bt.size}x${bt.size})`;
+      sel.appendChild(opt);
+    }
+  }
+  panel.style.display = 'block';
+  toggleLevelField();
+  document.getElementById('add-name').focus();
+}
+
+function closeAddPanel() {
+  document.getElementById('add-panel').style.display = 'none';
+  addPanelTarget = null;
+}
+
+function submitAddMember() {
+  if (!addPanelTarget) return;
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { document.getElementById('add-name').focus(); return; }
+  const building = document.getElementById('add-building').value;
+  const level = document.getElementById('add-level').value;
+  const { col, row } = addPanelTarget;
+  const size = BUILDING_TYPES[building].size;
+
+  if (!canPlace(col, row, size)) {
+    alert(`Not enough space for a ${size}x${size} building at ${displayCoords(col, row)}. Try another tile.`);
+    return;
+  }
+
+  const member = { name, plot: { col, row }, building };
+  if (building === 'player') member.level = level;
+  placeOnGrid(member);
+  alliance.members.push(member);
+
+  selectedTile = { col, row };
+  closeAddPanel();
+  showInfoPanel(member);
+  updateMemberCount();
+  render();
+}
+
+function updateMemberCount() {
+  document.getElementById('member-count').textContent = `${alliance.members.length} Members`;
+}
+
+// ─── Set Coordinates ─────────────────────────────────────────────
+let setCoordTarget = null;
+
+function showSetCoordPanel(col, row) {
+  setCoordTarget = { col, row };
+  closeInfoPanel();
+  const panel = document.getElementById('set-coord-panel');
+  document.getElementById('set-coord-info').innerHTML =
+    `<div style="font-size:12px;color:#8888aa;margin-bottom:4px">Tile ${displayCoords(col, row)}</div>`;
+  document.getElementById('set-coord-x').value = displayCol(col);
+  document.getElementById('set-coord-y').value = displayRow(row);
+  panel.style.display = 'block';
+  document.getElementById('set-coord-x').focus();
+}
+
+function closeSetCoordPanel() {
+  document.getElementById('set-coord-panel').style.display = 'none';
+  setCoordTarget = null;
+}
+
+function showSetCoordFromAdd() {
+  if (!addPanelTarget) return;
+  const { col, row } = addPanelTarget;
+  closeAddPanel();
+  showSetCoordPanel(col, row);
+}
+
+function submitSetCoord() {
+  if (!setCoordTarget) return;
+  const newX = parseInt(document.getElementById('set-coord-x').value);
+  const newY = parseInt(document.getElementById('set-coord-y').value);
+  if (isNaN(newX) || isNaN(newY)) return;
+  coordOffset.col = newX - setCoordTarget.col;
+  coordOffset.row = newY - setCoordTarget.row;
+  closeSetCoordPanel();
+  render();
+}
+
+// ─── Legend ───────────────────────────────────────────────────────────
+function buildLegend() {
+  const container = document.getElementById('legend-items');
+  for (const [key, bt] of Object.entries(BUILDING_TYPES)) {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-color" style="background:${bt.color}"></div><span>${bt.label}</span>`;
+    container.appendChild(item);
+  }
+}
+
+// ─── Expand Grid ─────────────────────────────────────────────────────
+function expandGrid(direction) {
+  const n = EXPAND_AMOUNT;
+  let colShift = 0, rowShift = 0;
+
+  switch (direction) {
+    case 'top':
+      GRID_ROWS += n;
+      rowShift = n;
+      break;
+    case 'bottom':
+      GRID_ROWS += n;
+      break;
+    case 'left':
+      GRID_COLS += n;
+      colShift = n;
+      break;
+    case 'right':
+      GRID_COLS += n;
+      break;
+  }
+
+  // Shift all member positions if expanding top or left
+  if (colShift || rowShift) {
+    alliance.members.forEach(m => {
+      m.plot.col += colShift;
+      m.plot.row += rowShift;
+    });
+  }
+
+  // Rebuild grid
+  grid = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(null));
+  alliance.members.forEach(m => placeOnGrid(m));
+
+  updateGridSize();
+  centerCamera();
+  render();
+}
+
+function updateGridSize() {
+  document.getElementById('grid-size').textContent = `${GRID_COLS}x${GRID_ROWS}`;
+}
+
+// ─── Import / Export ─────────────────────────────────────────────────
+function exportData() {
+  const data = {
+    gridCols: GRID_COLS,
+    gridRows: GRID_ROWS,
+    coordOffset,
+    members: alliance.members.map(m => {
+      const o = { name: m.name, col: m.plot.col, row: m.plot.row, building: m.building };
+      if (m.level) o.level = m.level;
+      return o;
+    })
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kingshot-alliance.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.members || !Array.isArray(data.members)) {
+        alert('Invalid file: missing members array.');
+        return;
+      }
+      GRID_COLS = data.gridCols || 24;
+      GRID_ROWS = data.gridRows || 24;
+      coordOffset.col = data.coordOffset?.col || 0;
+      coordOffset.row = data.coordOffset?.row || 0;
+      alliance.members.length = 0;
+      grid = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(null));
+      data.members.forEach(m => {
+        const member = { name: m.name, plot: { col: m.col, row: m.row }, building: m.building };
+        if (m.level) member.level = m.level;
+        if (canPlace(m.col, m.row, BUILDING_TYPES[m.building].size)) {
+          placeOnGrid(member);
+          alliance.members.push(member);
+        }
+      });
+      selectedTile = null;
+      closeInfoPanel();
+      closeAddPanel();
+      updateMemberCount();
+      updateGridSize();
+      centerCamera();
+      render();
+    } catch (err) {
+      alert('Failed to import: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ─── Init ────────────────────────────────────────────────────────────
+document.getElementById('member-count').textContent = `${alliance.members.length} Members`;
+updateGridSize();
+buildLegend();
+centerCamera();
+render();
+</script>
+</body>
+</html>
