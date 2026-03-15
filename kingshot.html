@@ -447,7 +447,7 @@ for (let i = 1; i <= 5; i++) LEVELS.push('T' + i);
 // ─── Display coordinates (with offset) ──────────────────────────────
 function displayCol(col) { return col + coordOffset.col; }
 function displayRow(row) { return row + coordOffset.row; }
-function displayCoords(col, row) { return `(${displayCol(col)}, ${displayRow(row)})`; }
+function displayCoords(col, row) { return `(${displayRow(row)}, ${displayCol(col)})`; }
 
 // ─── Grid helpers (multi-tile) ───────────────────────────────────────
 // grid[row][col] stores the member object for every tile it occupies.
@@ -1092,8 +1092,8 @@ function showSetCoordPanel(col, row) {
   const panel = document.getElementById('set-coord-panel');
   document.getElementById('set-coord-info').innerHTML =
     `<div style="font-size:12px;color:#8888aa;margin-bottom:4px">Tile ${displayCoords(col, row)}</div>`;
-  document.getElementById('set-coord-x').value = displayCol(col);
-  document.getElementById('set-coord-y').value = displayRow(row);
+  document.getElementById('set-coord-x').value = displayRow(row);
+  document.getElementById('set-coord-y').value = displayCol(col);
   panel.style.display = 'block';
   document.getElementById('set-coord-x').focus();
 }
@@ -1115,8 +1115,8 @@ function submitSetCoord() {
   const newX = parseInt(document.getElementById('set-coord-x').value);
   const newY = parseInt(document.getElementById('set-coord-y').value);
   if (isNaN(newX) || isNaN(newY)) return;
-  coordOffset.col = newX - setCoordTarget.col;
-  coordOffset.row = newY - setCoordTarget.row;
+  coordOffset.row = newX - setCoordTarget.row;
+  coordOffset.col = newY - setCoordTarget.col;
   closeSetCoordPanel();
   saveToStorage();
   render();
