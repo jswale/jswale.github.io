@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kingshot Alliance Map</title>
+<title>Kingshot Alliance Map v1.0</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -341,7 +341,7 @@
 
 <div id="ui-overlay">
   <div id="alliance-header">
-    <h1>Kingshot Alliance</h1>
+    <h1>Kingshot Alliance <span style="font-size:11px;color:#8888aa;letter-spacing:0">v1.0</span></h1>
     <div class="subtitle" id="member-count"></div>
   </div>
 
@@ -446,7 +446,7 @@ for (let i = 1; i <= 5; i++) LEVELS.push('T' + i);
 
 // ─── Display coordinates (with offset) ──────────────────────────────
 function displayCol(col) { return col + coordOffset.col; }
-function displayRow(row) { return row + coordOffset.row; }
+function displayRow(row) { return (GRID_ROWS - 1 - row) + coordOffset.row; }
 function displayCoords(col, row) { return `(${displayRow(row)}, ${displayCol(col)})`; }
 
 // ─── Grid helpers (multi-tile) ───────────────────────────────────────
@@ -1115,7 +1115,7 @@ function submitSetCoord() {
   const newX = parseInt(document.getElementById('set-coord-x').value);
   const newY = parseInt(document.getElementById('set-coord-y').value);
   if (isNaN(newX) || isNaN(newY)) return;
-  coordOffset.row = newX - setCoordTarget.row;
+  coordOffset.row = newX - (GRID_ROWS - 1 - setCoordTarget.row);
   coordOffset.col = newY - setCoordTarget.col;
   closeSetCoordPanel();
   saveToStorage();
