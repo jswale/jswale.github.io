@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Email Validator</title>
+  <title>Email Validator v1.0</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; min-height: 100vh; display: flex; justify-content: center; padding: 40px 20px; color: #333; }
@@ -53,7 +52,9 @@
       </div>
     </div>
     <p class="subtitle" id="subtitle"></p>
-    <textarea id="emails"></textarea>
+    <textarea id="emails">alice@example.com
+bob@company;com
+charlie@domain.con</textarea>
     <button class="btn-validate" id="btn-validate" onclick="validate()"></button>
     <div id="results"></div>
   </div>
@@ -94,7 +95,7 @@
         domainConsecDots: 'Domain contains consecutive dots',
         domainLabelHyphen: (label) => `Domain label "${label}" starts or ends with a hyphen`,
         domainLabelInvalid: (label) => `Domain label "${label}" contains invalid characters`,
-        domainTypo: (from, to) => `"${from}" looks like a typo for "${to}"`,
+        domainTypo: (from, to) => `Domain "${from}" looks like a typo for "${to}"`,
         tldTypo: (from, to) => `TLD ".${from}" looks like a typo for ".${to}"`,
         tldTooShort: (tld) => `TLD ".${tld}" is too short \u2014 likely a typo`,
         tldUnknown: (tld) => `TLD ".${tld}" is not a commonly recognized extension`,
@@ -135,7 +136,7 @@
         domainConsecDots: 'Le domaine contient des points cons\u00e9cutifs',
         domainLabelHyphen: (label) => `Le label "${label}" commence ou se termine par un tiret`,
         domainLabelInvalid: (label) => `Le label "${label}" contient des caract\u00e8res invalides`,
-        domainTypo: (from, to) => `"${from}" ressemble \u00e0 une faute de frappe pour "${to}"`,
+        domainTypo: (from, to) => `Le domaine "${from}" ressemble \u00e0 une faute de frappe pour "${to}"`,
         tldTypo: (from, to) => `L\u2019extension ".${from}" ressemble \u00e0 une faute de frappe pour ".${to}"`,
         tldTooShort: (tld) => `L\u2019extension ".${tld}" est trop courte \u2014 probablement une faute`,
         tldUnknown: (tld) => `L\u2019extension ".${tld}" n\u2019est pas couramment reconnue`,
@@ -210,6 +211,44 @@
       'outloo.com': 'outlook.com', 'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com',
       'iclod.com': 'icloud.com', 'icloud.con': 'icloud.com',
     };
+
+    // Known email providers: server name → full domain
+    const KNOWN_PROVIDERS = {
+      'gmail': 'gmail.com', 'googlemail': 'googlemail.com',
+      'hotmail': 'hotmail.com', 'outlook': 'outlook.com', 'live': 'live.com',
+      'yahoo': 'yahoo.com', 'ymail': 'ymail.com',
+      'icloud': 'icloud.com', 'me': 'me.com', 'mac': 'mac.com',
+      'protonmail': 'protonmail.com', 'proton': 'proton.me',
+      'aol': 'aol.com', 'zoho': 'zoho.com', 'mail': 'mail.com',
+      'gmx': 'gmx.com', 'fastmail': 'fastmail.com',
+      'orange': 'orange.fr', 'wanadoo': 'wanadoo.fr', 'free': 'free.fr',
+      'sfr': 'sfr.fr', 'laposte': 'laposte.net', 'bbox': 'bbox.fr',
+    };
+
+    function levenshtein(a, b) {
+      const m = a.length, n = b.length;
+      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      return dp[m][n];
+    }
+
+    function findClosestProvider(serverName) {
+      let best = null, bestDist = Infinity;
+      for (const known of Object.keys(KNOWN_PROVIDERS)) {
+        const dist = levenshtein(serverName, known);
+        // Allow distance 1 for short names (<=4), distance 2 for longer names, but never match exact
+        const maxDist = known.length <= 4 ? 1 : 2;
+        if (dist > 0 && dist <= maxDist && dist < bestDist) {
+          bestDist = dist;
+          best = known;
+        }
+      }
+      return best;
+    }
 
     function validate() {
       const raw = document.getElementById('emails').value.trim();
@@ -358,7 +397,16 @@
           return { issues, suggestions };
         }
 
+        // Fuzzy match server name against known providers
+        const serverName = labels.slice(0, -1).join('.');
         const tld = labels[labels.length - 1];
+        const closestProvider = !KNOWN_PROVIDERS[serverName] ? findClosestProvider(serverName) : null;
+        if (closestProvider) {
+          const correctDomain = KNOWN_PROVIDERS[closestProvider];
+          issues.push(I18N[lang].domainTypo(domainFixed, correctDomain));
+          suggestions.push(`${local}@${correctDomain}`);
+          return { issues, suggestions };
+        }
 
         if (TLD_TYPOS[tld]) {
           issues.push(I18N[lang].tldTypo(tld, TLD_TYPOS[tld]));
