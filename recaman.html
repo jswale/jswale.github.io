@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Recamán — a sequence drawn once</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070b16;
+    --panel:#0e1424;
+    --panel-2:#141c30;
+    --line:#1d2740;
+    --ink:#eef1f8;
+    --muted:#6f7c9c;
+    --muted-2:#465168;
+    --fwd:#39c6f7;      /* forward  -> blue  */
+    --back:#ff5d97;     /* backward -> pink  */
+    --fwd-glow:rgba(57,198,247,.55);
+    --back-glow:rgba(255,93,151,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 700px at 70% -10%, #101a33 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:"Space Grotesk",system-ui,sans-serif;
+    display:flex;flex-direction:column;
+    height:100vh;overflow:hidden;
+  }
+
+  header{
+    display:flex;align-items:flex-end;justify-content:space-between;
+    gap:24px;padding:20px 26px 14px;flex-wrap:wrap;
+  }
+  .brand h1{
+    margin:0;font-size:30px;font-weight:700;letter-spacing:-.02em;
+    line-height:1;
+  }
+  .brand h1 .n{color:var(--muted-2);font-weight:500}
+  .brand p{
+    margin:6px 0 0;color:var(--muted);font-size:13px;letter-spacing:.01em;
+  }
+
+  .readout{display:flex;gap:10px;align-items:stretch}
+  .stat{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:8px 14px;min-width:74px;text-align:left;
+  }
+  .stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+  .stat .v{font-family:"JetBrains Mono",monospace;font-size:22px;font-weight:600;line-height:1.1;margin-top:3px}
+  .badge{
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:600;
+    padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+    background:var(--panel);align-self:center;white-space:nowrap;
+  }
+  .badge .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+
+  .stage{flex:1;position:relative;margin:0 14px;min-height:0}
+  canvas{display:block;width:100%;height:100%}
+
+  footer{padding:14px 26px 20px;display:flex;flex-direction:column;gap:12px}
+  .terms{
+    font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    direction:rtl;text-align:left;height:18px;
+  }
+  .terms b{color:var(--ink);font-weight:600}
+
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .btns{display:flex;gap:8px}
+  button.ctl{
+    appearance:none;cursor:pointer;color:var(--ink);
+    background:var(--panel-2);border:1px solid var(--line);
+    width:46px;height:46px;border-radius:12px;
+    display:grid;place-items:center;transition:.16s transform,.16s background,.16s border-color;
+  }
+  button.ctl:hover{background:#1b2540;border-color:#2b3a5e}
+  button.ctl:active{transform:translateY(1px)}
+  button.ctl.primary{background:var(--fwd);border-color:var(--fwd);color:#04121a;width:54px}
+  button.ctl.primary:hover{background:#5ad2fa}
+  button.ctl svg{width:20px;height:20px;fill:currentColor}
+  button.ctl:focus-visible,input:focus-visible{outline:2px solid var(--fwd);outline-offset:2px}
+
+  .speed{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;
+         text-transform:uppercase;letter-spacing:.12em;margin-left:4px}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:160px;height:4px;border-radius:4px;
+    background:linear-gradient(90deg,var(--fwd),var(--back));cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:var(--ink);border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line)}
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;background:var(--ink);border:2px solid var(--bg)}
+
+  .legend{display:flex;gap:18px;margin-left:auto;align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .legend i{width:22px;height:11px;border-top:2px solid;border-radius:50% 50% 0 0/100% 100% 0 0}
+  .legend .fwd i{border-color:var(--fwd)}
+  .legend .back i{border-color:var(--back)}
+
+  @media (max-width:680px){
+    .brand h1{font-size:24px}.legend{display:none}
+    input[type=range]{width:120px}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Recamán<span class="n">&#8217;s sequence</span></h1>
+      <p>Jump back <i>n</i> if the spot is free, else forward <i>n</i>. Every move is a half&#8209;circle.</p>
+    </div>
+    <div class="readout">
+      <div class="stat"><div class="k">step n</div><div class="v" id="rN">0</div></div>
+      <div class="stat"><div class="k">a(n)</div><div class="v" id="rVal">0</div></div>
+      <div class="badge" id="rDir"><span class="dot" style="background:var(--muted-2)"></span>start</div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <canvas id="plot"></canvas>
+  </div>
+
+  <footer>
+    <div class="terms" id="terms"></div>
+    <div class="controls">
+      <div class="btns">
+        <button class="ctl primary" id="play" title="Play / pause" aria-label="Play or pause">
+          <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="ctl" id="step" title="One step" aria-label="Advance one step">
+          <svg viewBox="0 0 24 24"><path d="M6 5v14l9-7zM16 5h3v14h-3z"/></svg>
+        </button>
+        <button class="ctl" id="reset" title="Reset" aria-label="Reset">
+          <svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V8a5 5 0 1 1-5 5H5a7 7 0 1 0 7-8z"/></svg>
+        </button>
+      </div>
+      <div class="speed">
+        <span>speed</span>
+        <input type="range" id="speed" min="0" max="1" step="0.01" value="0.55" aria-label="Speed">
+      </div>
+      <div class="legend">
+        <span class="back"><i></i>backward&nbsp;&mdash;&nbsp;unused spot</span>
+        <span class="fwd"><i></i>forward&nbsp;&mdash;&nbsp;new ground</span>
+      </div>
+    </div>
+  </footer>
+
+<script>
+(() => {
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cvs = document.getElementById('plot');
+  const ctx = cvs.getContext('2d');
+
+  // ---- elements ----
+  const elN = document.getElementById('rN');
+  const elVal = document.getElementById('rVal');
+  const elDir = document.getElementById('rDir');
+  const elTerms = document.getElementById('terms');
+  const elPlay = document.getElementById('play');
+  const elPlayIcon = document.getElementById('playIcon');
+  const elStep = document.getElementById('step');
+  const elReset = document.getElementById('reset');
+  const elSpeed = document.getElementById('speed');
+
+  // ---- sizing (high-DPI) ----
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+  let W = 0, H = 0;
+  function resize(){
+    const r = cvs.getBoundingClientRect();
+    W = Math.max(1, r.width); H = Math.max(1, r.height);
+    cvs.width = Math.round(W * dpr); cvs.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(cvs);
+  resize();
+
+  // ---- state ----
+  let arcs, seen, n, prev, maxX, active, animProg, playing, stepping, scale;
+  const MARGIN = { l: 56, r: 40, t: 30, b: 30 };
+
+  function reset(){
+    arcs = [];
+    seen = new Set([0]);
+    n = 0; prev = 0; maxX = 1;
+    active = null; animProg = 0;
+    playing = false; stepping = false;
+    scale = (W - MARGIN.l - MARGIN.r); // fit a single unit at start; corrected by fit()
+    setReadout(null, 0, 0);
+    renderTerms();
+    setPlayIcon();
+  }
+
+  // Recamán step: build the next arc record
+  function computeNext(){
+    n += 1;
+    const cand = prev - n;
+    const backward = (cand > 0 && !seen.has(cand));
+    const cur = backward ? cand : prev + n;
+    seen.add(cur);
+    active = { prev, cur, n, top: (n % 2 === 1), backward };
+    animProg = 0;
+    maxX = Math.max(maxX, cur, prev, 1);
+    setReadout(backward, n, cur);
+    prev = cur;
+  }
+
+  // ---- readouts ----
+  function setReadout(backward, step, val){
+    elN.textContent = step;
+    elVal.textContent = val;
+    if (backward === null){
+      elDir.innerHTML = '<span class="dot" style="background:var(--muted-2)"></span>start';
+    } else if (backward){
+      elDir.innerHTML = '<span class="dot" style="background:var(--back)"></span>&minus;'+step+' &nbsp;backward';
+    } else {
+      elDir.innerHTML = '<span class="dot" style="background:var(--fwd)"></span>+'+step+' &nbsp;forward';
+    }
+  }
+  function renderTerms(){
+    const vals = [0];
+    // reconstruct visible tail from arcs + active
+    for (const a of arcs) vals.push(a.cur);
+    if (active) vals.push(active.cur);
+    const tail = vals.slice(-14);
+    elTerms.innerHTML = tail.map((v,i)=> i===tail.length-1 ? '<b>'+v+'</b>' : v).join('&nbsp;&middot;&nbsp;');
+  }
+
+  // ---- geometry ----
+  let baseY = 0;
+  let targetScale = 1;
+  function fit(){
+    const usableW = W - MARGIN.l - MARGIN.r;
+    const usableH = H - MARGIN.t - MARGIN.b;
+    baseY = MARGIN.t + usableH / 2;
+    const maxR = Math.max(n / 2, 1);          // largest semicircle radius so far
+    const sx = usableW / Math.max(maxX, 1);
+    const sy = (usableH / 2) / maxR;
+    targetScale = Math.min(sx, sy);
+    if (!isFinite(targetScale) || targetScale <= 0) targetScale = 1;
+  }
+  const wx = x => MARGIN.l + x * scale;
+
+  function niceStep(targetPx){
+    const worldPer = targetPx / scale;
+    const mag = Math.pow(10, Math.floor(Math.log10(worldPer)));
+    const norm = worldPer / mag;
+    let s = (norm < 1.5) ? 1 : (norm < 3) ? 2 : (norm < 7) ? 5 : 10;
+    return Math.max(1, s * mag);
+  }
+
+  // ---- drawing ----
+  function drawAxis(){
+    const xRight = W - MARGIN.r;
+    const step = niceStep(72);
+    ctx.lineWidth = 1;
+    // faint vertical guides
+    ctx.strokeStyle = 'rgba(70,81,104,0.16)';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    const maxTick = Math.floor((xRight - MARGIN.l) / scale);
+    for (let v = 0; v <= maxTick + step; v += step){
+      const px = wx(v);
+      if (px > xRight + 1) break;
+      ctx.beginPath();
+      ctx.moveTo(px, MARGIN.t); ctx.lineTo(px, H - MARGIN.b);
+      ctx.stroke();
+    }
+    // baseline
+    ctx.strokeStyle = 'rgba(120,134,168,0.55)';
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(MARGIN.l, baseY); ctx.lineTo(xRight, baseY); ctx.stroke();
+    // tick marks + labels
+    ctx.fillStyle = '#7e8aa8';
+    for (let v = 0; v <= maxTick + step; v += step){
+      const px = wx(v);
+      if (px > xRight + 1) break;
+      ctx.strokeStyle = 'rgba(120,134,168,0.55)';
+      ctx.beginPath(); ctx.moveTo(px, baseY); ctx.lineTo(px, baseY + 6); ctx.stroke();
+      ctx.fillText(String(v), px, baseY + 19);
+    }
+  }
+
+  // returns the {start, sweep} describing a semicircle from prev->cur
+  function arcParams(a){
+    const forward = a.cur > a.prev; // forward == moving right
+    let start, sweep;
+    if (a.top){
+      if (forward){ start = Math.PI;     sweep =  Math.PI; }
+      else        { start = 2*Math.PI;   sweep = -Math.PI; }
+    } else {
+      if (forward){ start = Math.PI;     sweep = -Math.PI; }
+      else        { start = 0;           sweep =  Math.PI; }
+    }
+    return { start, sweep };
+  }
+
+  function drawArc(a, p, isActive){
+    const cxw = (a.prev + a.cur) / 2;
+    const r = Math.abs(a.cur - a.prev) / 2;
+    const cx = wx(cxw), cy = baseY, R = r * scale;
+    const { start, sweep } = arcParams(a);
+    const end = start + sweep * p;
+    const color = a.backward ? '#ff5d97' : '#39c6f7';
+
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = color;
+    if (isActive && !REDUCED){
+      ctx.lineWidth = 2.6;
+      ctx.shadowColor = a.backward ? 'rgba(255,93,151,.55)' : 'rgba(57,198,247,.55)';
+      ctx.shadowBlur = 14;
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.9;
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, start, end, sweep < 0);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    if (isActive && !REDUCED && R > 0){
+      // pen / beam head
+      const penX = cx + R * Math.cos(end);
+      const penY = cy + R * Math.sin(end);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(penX, penY, 3.4, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+    drawAxis();
+    for (const a of arcs) drawArc(a, 1, false);
+    if (active) drawArc(active, REDUCED ? 1 : animProg, true);
+  }
+
+  // ---- loop ----
+  let last = null;
+  function frame(t){
+    if (last == null) last = t;
+    const dt = Math.min(64, t - last); last = t;
+
+    fit();
+    const k = REDUCED ? 1 : Math.min(1, dt / 170);
+    scale += (targetScale - scale) * k;
+
+    if (active && (playing || stepping)){
+      const dur = animDur();
+      animProg += REDUCED ? 1 : dt / dur;
+      if (animProg >= 1){
+        arcs.push(active); active = null; animProg = 0;
+        renderTerms();
+        if (playing){ computeNext(); renderTerms(); }
+        else stepping = false;
+      }
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function animDur(){
+    const v = parseFloat(elSpeed.value);     // 0..1
+    return 1200 * Math.pow(0.09, v);          // ~1200ms slow -> ~110ms fast
+  }
+
+  // ---- controls ----
+  function setPlayIcon(){
+    elPlayIcon.innerHTML = playing
+      ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'   // pause
+      : '<path d="M8 5v14l11-7z"/>';                // play
+  }
+  function togglePlay(){
+    playing = !playing;
+    if (playing && !active) computeNext();
+    setPlayIcon();
+  }
+  function doStep(){
+    if (playing){ playing = false; setPlayIcon(); }
+    if (active){ // finish the one in flight first
+      arcs.push(active); active = null; renderTerms();
+    }
+    computeNext(); renderTerms();
+    stepping = true;
+  }
+  function doReset(){ reset(); }
+
+  elPlay.addEventListener('click', togglePlay);
+  elStep.addEventListener('click', doStep);
+  elReset.addEventListener('click', doReset);
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space'){ e.preventDefault(); togglePlay(); }
+    else if (e.code === 'ArrowRight'){ e.preventDefault(); doStep(); }
+    else if (e.key === 'r' || e.key === 'R'){ doReset(); }
+  });
+
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
