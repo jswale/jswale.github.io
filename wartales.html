@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commerce - Wartales</title>
+<style>
+  :root {
+    --bg: #12161c;
+    --panel: #1c2330;
+    --panel2: #232c3d;
+    --border: #2e3a4e;
+    --text: #e6e9ef;
+    --muted: #93a0b4;
+    --accent: #d9a441;
+    --green: #6fbf73;
+    --red: #d06a6a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; color: var(--accent); }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    max-width: 1000px;
+  }
+  .panel h2 { font-size: 15px; margin-bottom: 12px; }
+  .cities { display: flex; flex-wrap: wrap; gap: 8px; }
+  .city-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 8px 14px; cursor: pointer;
+    user-select: none; font-size: 14px; transition: all .15s;
+  }
+  .city-chip input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .city-chip.known { border-color: var(--accent); background: #2c2a1c; }
+  .city-chip .city-info { display: flex; flex-direction: column; line-height: 1.15; }
+  .city-chip .county { color: var(--muted); font-size: 11px; }
+  .city-chip .price-min { color: var(--green); font-size: 11px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .summary {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; max-width: 1000px;
+  }
+  .summary .best {
+    font-size: 14px; flex: 1; min-width: 280px;
+  }
+  .summary .big { color: var(--green); font-weight: 600; }
+  .summary .total {
+    font-size: 14px; color: var(--muted); text-align: right;
+  }
+  .summary .total .amount { color: var(--accent); font-size: 20px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th {
+    background: var(--panel2); color: var(--muted); font-weight: 600;
+    font-size: 12px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: rgba(255,255,255,.03); }
+  .pos { color: var(--green); font-weight: 600; }
+  .arrow { color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; padding: 16px; text-align: center; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1000px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+  .chip.good { background: #2c2a1c; color: var(--accent); }
+  .rank { color: var(--muted); }
+  .route-line { font-size: 15px; margin-bottom: 12px; padding: 10px 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
+  .route-city { color: var(--accent); font-weight: 600; }
+  .stops { margin-bottom: 12px; }
+  .stop { padding: 4px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>Commerce &mdash; Routage des marchandises</h1>
+  <div class="sub">Sélectionnez les villes connues. Le plan optimal achète 5 unités de chaque marchandise (capacité vendeur) au prix le plus bas et les revend au prix le plus haut, uniquement entre provinces reliées directement.</div>
+
+  <div class="panel">
+    <h2>Villes connues</h2>
+    <div class="cities" id="cities"></div>
+    <div class="hint">Décochez les villes non découvertes. Il faut au moins 2 villes connues. Routes directes : Arthes-Tiltrën, Tiltrën-Vertruse, Grinmeer-Vertruse, Vertruse-Drombach, Ludern-Vertruse.</div>
+  </div>
+
+  <div class="summary" id="summary" style="display:none;"></div>
+
+  <div class="panel" id="circuitPanel" style="display:none;">
+    <h2>Meilleur aller-retour commercial (2+ trajets)</h2>
+    <div id="circuit"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Plan optimal global</h2>
+      <div id="optimal"></div>
+    </div>
+    <div class="panel">
+      <h2>Toutes les routes rentables</h2>
+      <div id="all"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const data = {
+    cities: ["New-Asthel", "Marheim", "Gosenberg", "Stromkapp", "Garussa", "Cortia"],
+    goods: ["Amber", "Gems", "Pelts", "Pottery", "Scrolls", "Silver", "Spice", "Wool"],
+    names: { "Amber": "Ambre", "Gems": "Gemmes", "Pelts": "Peaux", "Pottery": "Poterie", "Scrolls": "Parchemins", "Silver": "Argent", "Spice": "Épices", "Wool": "Laine" },
+    counties: { "New-Asthel": "Drombach", "Marheim": "Vertruse", "Gosenberg": "Grinmeer", "Stromkapp": "Tiltrën", "Garussa": "Ludern", "Cortia": "Arthes" },
+    connections: [["Arthes", "Tiltrën"], ["Tiltrën", "Vertruse"], ["Grinmeer", "Vertruse"], ["Vertruse", "Drombach"], ["Ludern", "Vertruse"]],
+    prices: {
+      "Amber":    { "New-Asthel": 40, "Marheim": 65, "Gosenberg": 78, "Stromkapp": 40, "Garussa": 40, "Cortia": 74 },
+      "Gems":     { "New-Asthel": 176, "Marheim": 147, "Gosenberg": 102, "Stromkapp": 149, "Garussa": 158, "Cortia": 80 },
+      "Pelts":    { "New-Asthel": 60, "Marheim": 120, "Gosenberg": 118, "Stromkapp": 111, "Garussa": 60, "Cortia": 60 },
+      "Pottery":  { "New-Asthel": 126, "Marheim": 98, "Gosenberg": 77, "Stromkapp": 60, "Garussa": 118, "Cortia": 111 },
+      "Scrolls":  { "New-Asthel": 120, "Marheim": 60, "Gosenberg": 77, "Stromkapp": 98, "Garussa": 60, "Cortia": 129 },
+      "Silver":   { "New-Asthel": 161, "Marheim": 80, "Gosenberg": 138, "Stromkapp": 130, "Garussa": 160, "Cortia": 172 },
+      "Spice":    { "New-Asthel": 80, "Marheim": 40, "Gosenberg": 69, "Stromkapp": 65, "Garussa": 40, "Cortia": 40 },
+      "Wool":     { "New-Asthel": 40, "Marheim": 65, "Gosenberg": 82, "Stromkapp": 40, "Garussa": 84, "Cortia": 74 }
+    }
+  };
+  const MAX_QTY = 5;
+
+  const citiesEl = document.getElementById("cities");
+  const summaryEl = document.getElementById("summary");
+  const optimalEl = document.getElementById("optimal");
+  const allEl = document.getElementById("all");
+  const circuitPanel = document.getElementById("circuitPanel");
+  const circuitEl = document.getElementById("circuit");
+
+  function connected(a, b) {
+    const pa = data.counties[a];
+    const pb = data.counties[b];
+    if (!pa || !pb || pa === pb) return false;
+    return data.connections.some(function (c) {
+      return (c[0] === pa && c[1] === pb) || (c[0] === pb && c[1] === pa);
+    });
+  }
+
+  function minPrice(city) {
+    let m = Infinity, g = null;
+    for (const good of data.goods) {
+      const p = data.prices[good][city];
+      if (p < m) { m = p; g = good; }
+    }
+    return { price: m, good: g, name: data.names[g] };
+  }
+
+  function renderCities(known) {
+    citiesEl.innerHTML = "";
+    for (const city of data.cities) {
+      const p = minPrice(city);
+      const label = document.createElement("label");
+      label.className = "city-chip" + (known.has(city) ? " known" : "");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.dataset.city = city;
+      cb.checked = known.has(city);
+      cb.addEventListener("change", function () {
+        if (cb.checked) known.add(city); else known.delete(city);
+        label.classList.toggle("known", cb.checked);
+        recompute();
+      });
+      label.appendChild(cb);
+      const info = document.createElement("span");
+      info.className = "city-info";
+      const name = document.createElement("span");
+      name.className = "city-name";
+      name.textContent = city;
+      info.appendChild(name);
+      if (data.counties[city]) {
+        const county = document.createElement("span");
+        county.className = "county";
+        county.textContent = data.counties[city];
+        info.appendChild(county);
+      }
+      label.appendChild(info);
+      const span = document.createElement("span");
+      span.className = "price-min";
+      span.textContent = p.name + " " + p.price;
+      label.appendChild(span);
+      citiesEl.appendChild(label);
+    }
+  }
+
+  function allRoutes(known) {
+    const routes = [];
+    for (const good of data.goods) {
+      for (const buy of known) {
+        for (const sell of known) {
+          if (buy === sell) continue;
+          if (!connected(buy, sell)) continue;
+          const buyP = data.prices[good][buy];
+          const sellP = data.prices[good][sell];
+          const unit = sellP - buyP;
+          if (unit > 0) routes.push({ good, buy, sell, buyP, sellP, unit, total: unit * MAX_QTY });
+        }
+      }
+    }
+    routes.sort(function (a, b) { return b.total - a.total; });
+    return routes;
+  }
+
+  function optimalRoutes(known) {
+    const rows = [];
+    let grandTotal = 0;
+    for (const good of data.goods) {
+      let best = null;
+      for (const buy of known) {
+        for (const sell of known) {
+          if (buy === sell) continue;
+          if (!connected(buy, sell)) continue;
+          const unit = data.prices[good][sell] - data.prices[good][buy];
+          if (unit > 0 && (!best || unit > best.unit)) {
+            best = { good, buy, sell, buyP: data.prices[good][buy], sellP: data.prices[good][sell], unit, total: unit * MAX_QTY };
+          }
+        }
+      }
+      if (best) { rows.push(best); grandTotal += best.total; }
+    }
+    rows.sort(function (a, b) { return b.total - a.total; });
+    return { rows: rows, total: grandTotal };
+  }
+
+  function cityOfProvince(p) {
+    for (const city of data.cities) if (data.counties[city] === p) return city;
+    return null;
+  }
+
+  function buildAdj() {
+    const adj = {};
+    for (const city of data.cities) adj[city] = [];
+    for (const c of data.connections) {
+      const a = cityOfProvince(c[0]);
+      const b = cityOfProvince(c[1]);
+      if (a && b) { adj[a].push(b); adj[b].push(a); }
+    }
+    return adj;
+  }
+
+  function permutations(arr) {
+    if (arr.length <= 1) return [arr.slice()];
+    const out = [];
+    for (let i = 0; i < arr.length; i++) {
+      const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+      const ps = permutations(rest);
+      for (let k = 0; k < ps.length; k++) out.push([arr[i]].concat(ps[k]));
+    }
+    return out;
+  }
+
+  function genRoundTrips(adj, known) {
+    function walksFrom(node, visited) {
+      const neigh = adj[node].filter(function (n) { return known.has(n) && !visited.has(n); });
+      if (neigh.length === 0) return [[node]];
+      const result = [];
+      const orders = permutations(neigh);
+      for (const order of orders) {
+        const v2 = new Set(visited);
+        let walks = [[node]];
+        for (const n of order) {
+          v2.add(n);
+          const subs = walksFrom(n, v2);
+          const next = [];
+          for (const w of walks) {
+            for (const sub of subs) next.push(w.concat(sub).concat([node]));
+          }
+          walks = next;
+        }
+        result.push.apply(result, walks);
+      }
+      return result;
+    }
+    const all = [];
+    for (const root of known) all.push.apply(all, walksFrom(root, new Set([root])));
+    return all;
+  }
+
+  function walkProfit(seq) {
+    let total = 0;
+    const plan = {};
+    for (const good of data.goods) {
+      let minP = Infinity, minIdx = -1, best = 0, buyIdx = -1, sellIdx = -1;
+      for (let i = 0; i < seq.length; i++) {
+        const p = data.prices[good][seq[i]];
+        if (minIdx >= 0 && p - minP > best) {
+          best = p - minP; buyIdx = minIdx; sellIdx = i;
+        }
+        if (p < minP) { minP = p; minIdx = i; }
+      }
+      if (best > 0) {
+        const t = best * MAX_QTY;
+        total += t;
+        plan[good] = { buyIdx: buyIdx, sellIdx: sellIdx, buyP: data.prices[good][seq[buyIdx]], sellP: data.prices[good][seq[sellIdx]], unit: best, total: t };
+      }
+    }
+    return { total: total, plan: plan };
+  }
+
+  function circuitHtml(best, top) {
+    const seq = best.seq;
+    let html = '<div class="route-line">' + seq.map(function (c, i) {
+      return '<span class="route-city">' + c + '</span>' + (i < seq.length - 1 ? ' <span class="arrow">&rarr;</span> ' : '');
+    }).join("") + ' <span class="big">+' + best.total + '</span></div>';
+
+    const stops = seq.map(function (city, i) { return { city: city, i: i, buy: [], sell: [] }; });
+    for (const g in best.plan) {
+      const p = best.plan[g];
+      stops[p.buyIdx].buy.push((data.names[g] || g) + " " + p.buyP);
+      stops[p.sellIdx].sell.push((data.names[g] || g) + " " + p.sellP + " <span class='pos'>(+" + p.total + ")</span>");
+    }
+    html += '<div class="stops">' + stops.map(function (s, i) {
+      const lines = [];
+      if (s.buy.length) lines.push("Acheter : " + s.buy.join(", "));
+      if (s.sell.length) lines.push("Vendre : " + s.sell.join(", "));
+      if (!lines.length) return "";
+      return '<div class="stop"><b>' + (i + 1) + ". " + s.city + "</b> &mdash; " + lines.join(" &middot; ") + "</div>";
+    }).join("") + "</div>";
+
+    html += "<table><thead><tr><th>Marchandise</th><th>Achat</th><th>Vente</th><th class=\"num\">Bénéfice/u</th><th class=\"num\">x5</th></tr></thead><tbody>";
+    const goods = data.goods.filter(function (g) { return best.plan[g]; })
+      .sort(function (a, b) { return best.plan[b].total - best.plan[a].total; });
+    for (const g of goods) {
+      const p = best.plan[g];
+      html += "<tr><td><span class=\"chip good\">" + (data.names[g] || g) + "</span></td>" +
+        "<td>" + seq[p.buyIdx] + " (" + p.buyP + ")</td>" +
+        "<td>" + seq[p.sellIdx] + " (" + p.sellP + ")</td>" +
+        '<td class="num pos">+' + p.unit + "</td>" +
+        '<td class="num pos">+' + p.total + "</td></tr>";
+    }
+    html += "</tbody></table>";
+
+    if (top.length > 1) {
+      html += '<div class="hint" style="margin-top:12px;">Autres circuits :</div><div class="stops">' +
+        top.slice(1, 6).map(function (t) {
+          return '<div class="stop">' + t.seq.map(function (c, i) {
+            return '<span class="route-city">' + c + "</span>" + (i < t.seq.length - 1 ? " &rarr; " : "");
+          }).join("") + ' <span class="pos">+' + t.total + '</span></div>';
+        }).join("") + "</div>";
+    }
+    return html;
+  }
+
+  function rowHtml(r, showRank) {
+    const rank = showRank ? '<span class="rank">#' + showRank + '</span> ' : "";
+    return "<tr>" +
+      "<td>" + rank + '<span class="chip good">' + (data.names[r.good] || r.good) + '</span></td>' +
+      "<td>" + r.buy + " <span class='arrow'>&rarr;</span> " + r.sell + "</td>" +
+      '<td class="num">' + r.buyP + "</td>" +
+      '<td class="num">' + r.sellP + "</td>" +
+      '<td class="num pos">+' + r.unit + "</td>" +
+      '<td class="num pos">+' + r.total + "</td>" +
+      "</tr>";
+  }
+
+  function compute() {
+    const known = new Set(data.cities);
+    renderCities(known);
+    recompute();
+  }
+
+  function recompute() {
+    const known = new Set();
+    citiesEl.querySelectorAll("input").forEach(function (cb) {
+      if (cb.checked) known.add(cb.dataset.city);
+    });
+
+    if (known.size < 2) {
+      summaryEl.style.display = "none";
+      optimalEl.innerHTML = '<div class="empty">Sélectionnez au moins 2 villes connues.</div>';
+      allEl.innerHTML = "";
+      circuitPanel.style.display = "none";
+      circuitEl.innerHTML = "";
+      return;
+    }
+
+    const opt = optimalRoutes(known);
+    const routes = allRoutes(known);
+
+    const adj = buildAdj();
+    const trips = [];
+    for (const seq of genRoundTrips(adj, known)) {
+      if (seq.length < 3) continue;
+      const pr = walkProfit(seq);
+      if (pr.total > 0) trips.push({ seq: seq, total: pr.total, plan: pr.plan });
+    }
+    trips.sort(function (a, b) { return b.total - a.total; });
+    const best = trips[0];
+
+    if (best) {
+      circuitPanel.style.display = "";
+      circuitEl.innerHTML = circuitHtml(best, trips);
+    } else {
+      circuitPanel.style.display = "none";
+      circuitEl.innerHTML = "";
+    }
+
+    summaryEl.style.display = "";
+    summaryEl.innerHTML =
+      '<div class="best">' +
+      (opt.rows.length
+        ? "Meilleure route : acheter <b>" + (data.names[opt.rows[0].good] || opt.rows[0].good) + "</b> à <b>" + opt.rows[0].buy + "</b> (" + opt.rows[0].buyP + ") et revendre à <b>" + opt.rows[0].sell + "</b> (" + opt.rows[0].sellP + ") &mdash; <span class='big'>+" + opt.rows[0].total + " / 5&nbsp;unités</span>"
+        : "Aucune route rentable entre ces villes.")
+      + "</div>" +
+      '<div class="total">Bénéfice optimal total<br><span class="amount">+' + opt.total + '</span></div>';
+
+    optimalEl.innerHTML = opt.rows.length
+      ? "<table><thead><tr><th>Marchandise</th><th>Route</th><th class=\"num\">Achat</th><th class=\"num\">Vente</th><th class=\"num\">Bénéfice/u</th><th class=\"num\">x5</th></tr></thead><tbody>" +
+        opt.rows.map(function (r) { return rowHtml(r, false); }).join("") + "</tbody></table>"
+      : '<div class="empty">Aucune route rentable entre ces villes.</div>';
+
+    allEl.innerHTML = routes.length
+      ? "<table><thead><tr><th>Marchandise</th><th>Route</th><th class=\"num\">Achat</th><th class=\"num\">Vente</th><th class=\"num\">Bénéfice/u</th><th class=\"num\">x5</th></tr></thead><tbody>" +
+        routes.map(function (r, i) { return rowHtml(r, i + 1); }).join("") + "</tbody></table>"
+      : '<div class="empty">Aucune route rentable entre ces villes.</div>';
+  }
+
+  compute();
+})();
+</script>
+</body>
+</html>
