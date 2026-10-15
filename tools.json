@@ -64,5 +64,27 @@
       "Généalogie"
     ],
     "url": "https://github.com/jswale/gedcom-js-viewer"
+  },
+  {
+    "name": "EatMe",
+    "icon": "🍽️",
+    "category": "Web",
+    "description": "Site de recettes de cuisine.",
+    "tags": [
+      "PHP",
+      "Recettes"
+    ],
+    "url": "https://github.com/jswale/eatme"
+  },
+  {
+    "name": "TerriSuite",
+    "icon": "🏛️",
+    "category": "Application",
+    "description": "Suivi de subventions pour les collectivités territoriales.",
+    "tags": [
+      "Next.js",
+      "Collectivités"
+    ],
+    "url": "https://github.com/jswale/terrisuite"
   }
 ]
