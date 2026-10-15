@@ -55,6 +55,17 @@
     "url": "wartales.html"
   },
   {
+    "name": "Multi Window",
+    "icon": "🪟",
+    "category": "Web",
+    "description": "Effet d'intrication quantique entre fenêtres : ouvrez plusieurs fenêtres, les sphères s'attirent et se répondent d'une fenêtre à l'autre.",
+    "tags": [
+      "JavaScript",
+      "Canvas"
+    ],
+    "url": "multi-window.html"
+  },
+  {
     "name": "Gedcom JS Viewer",
     "icon": "🌳",
     "category": "Web",
