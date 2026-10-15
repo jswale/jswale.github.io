@@ -86,5 +86,16 @@
       "Collectivités"
     ],
     "url": "https://github.com/jswale/terrisuite"
+  },
+  {
+    "name": "Pixel Art LEGO",
+    "icon": "🧱",
+    "category": "Web",
+    "description": "Transforme une image en plan de plaques LEGO : recadrage, réglage des couleurs et liste des pièces.",
+    "tags": [
+      "JavaScript",
+      "LEGO"
+    ],
+    "url": "https://github.com/jswale/pixel"
   }
 ]
