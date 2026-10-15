@@ -53,5 +53,16 @@
       "Optimisation"
     ],
     "url": "wartales.html"
+  },
+  {
+    "name": "Gedcom JS Viewer",
+    "icon": "🌳",
+    "category": "Web",
+    "description": "Visionneuse de fichiers généalogiques GEDCOM, 100 % JavaScript, multilingue.",
+    "tags": [
+      "JavaScript",
+      "Généalogie"
+    ],
+    "url": "https://github.com/jswale/gedcom-js-viewer"
   }
 ]
