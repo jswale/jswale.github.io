@@ -1,0 +1,135 @@
+[
+  {
+    "name": "Ciné-Quiz",
+    "icon": "🎬",
+    "category": "Jeux",
+    "description": "Quiz de cinéma interactif.",
+    "tags": [
+      "React",
+      "Quiz"
+    ],
+    "url": "cine.html"
+  },
+  {
+    "name": "Email Validator",
+    "icon": "✉️",
+    "category": "Web",
+    "description": "Validation de listes d'adresses email, avec détection des erreurs de saisie.",
+    "tags": [
+      "JavaScript",
+      "Email"
+    ],
+    "url": "email.html"
+  },
+  {
+    "name": "Kingshot Alliance Map",
+    "icon": "🏰",
+    "category": "Jeux",
+    "description": "Carte d'alliance pour planifier la stratégie sur Kingshot.",
+    "tags": [
+      "Jeu",
+      "Planification"
+    ],
+    "url": "kingshot.html"
+  },
+  {
+    "name": "Recamán",
+    "icon": "🌀",
+    "category": "Web",
+    "description": "Visualisation animée de la suite de Recamán.",
+    "tags": [
+      "Maths",
+      "Canvas"
+    ],
+    "url": "recaman.html"
+  },
+  {
+    "name": "Wartales — Commerce",
+    "icon": "⚔️",
+    "category": "Jeux",
+    "description": "Routage des marchandises : meilleurs allers-retours et plan commercial optimal.",
+    "tags": [
+      "Jeu",
+      "Optimisation"
+    ],
+    "url": "wartales.html"
+  },
+  {
+    "name": "Gedcom JS Viewer",
+    "icon": "🌳",
+    "category": "Web",
+    "description": "Visionneuse de fichiers généalogiques GEDCOM, 100 % JavaScript, multilingue.",
+    "tags": [
+      "JavaScript",
+      "Généalogie"
+    ],
+    "url": "https://jswale.github.io/gedcom-js-viewer/"
+  },
+  {
+    "name": "gen.io",
+    "icon": "👪",
+    "category": "Application",
+    "description": "Application de généalogie construite par itérations (Next.js + Prisma).",
+    "tags": [
+      "Next.js",
+      "Prisma",
+      "Généalogie"
+    ],
+    "url": "https://github.com/jswale/gen.io"
+  },
+  {
+    "name": "TerriSuite",
+    "icon": "🏛️",
+    "category": "Application",
+    "description": "Suivi de subventions pour les collectivités territoriales.",
+    "tags": [
+      "Next.js",
+      "Collectivités"
+    ],
+    "url": "https://github.com/jswale/terrisuite"
+  },
+  {
+    "name": "TLS",
+    "icon": "🏅",
+    "category": "Application",
+    "description": "Gestion d'équipes sportives multi-clubs, multi-sports, avec statistiques et tendances.",
+    "tags": [
+      "Next.js",
+      "Sport"
+    ],
+    "url": "https://github.com/jswale/TLS"
+  },
+  {
+    "name": "Castorus",
+    "icon": "🦫",
+    "category": "Extension",
+    "description": "Extension Chrome qui enrichit les pages web avec des tableaux basés sur leurs données.",
+    "tags": [
+      "Chrome",
+      "JavaScript"
+    ],
+    "url": "https://github.com/jswale/castorus"
+  },
+  {
+    "name": "Pixel",
+    "icon": "🎨",
+    "category": "Web",
+    "description": "Petit outil de pixel art dans le navigateur.",
+    "tags": [
+      "HTML",
+      "Canvas"
+    ],
+    "url": "https://github.com/jswale/pixel"
+  },
+  {
+    "name": "Auto Search",
+    "icon": "🔎",
+    "category": "Application",
+    "description": "Recherche automatisée avec moteur local et API.",
+    "tags": [
+      "Node.js",
+      "API"
+    ],
+    "url": "https://github.com/jswale/auto-search"
+  }
+]
