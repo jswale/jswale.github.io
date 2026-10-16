@@ -396,6 +396,7 @@
   <div id="io-panel">
     <button class="io-btn" onclick="exportData()">Export</button>
     <button class="io-btn" onclick="document.getElementById('import-file').click()">Import</button>
+    <button class="io-btn" onclick="optimizeAroundBearTrap()">Optimize</button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
   </div>
 
@@ -442,12 +443,12 @@ const BUILDING_KEYS = Object.keys(BUILDING_TYPES);
 // ─── Levels ─────────────────────────────────────────────────────────
 const LEVELS = [];
 for (let i = 1; i <= 30; i++) LEVELS.push(String(i));
-for (let i = 1; i <= 5; i++) LEVELS.push('T' + i);
+for (let i = 1; i <= 9; i++) LEVELS.push('TG' + i);
 
 // ─── Display coordinates (with offset) ──────────────────────────────
 function displayCol(col) { return col + coordOffset.col; }
-function displayRow(row) { return (GRID_ROWS - 1 - row) + coordOffset.row; }
-function displayCoords(col, row) { return `(${displayRow(row)}, ${displayCol(col)})`; }
+function displayRow(row) { return row + coordOffset.row; }
+function displayCoords(col, row) { return `(${displayCol(col)}, ${displayRow(row)})`; }
 
 // ─── Grid helpers (multi-tile) ───────────────────────────────────────
 // grid[row][col] stores the member object for every tile it occupies.
@@ -566,7 +567,8 @@ function screenToGrid(sx, sy) {
   const wy = (sy - camera.y) / camera.zoom;
   const col = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
   const row = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
-  return { col: Math.floor(col), row: Math.floor(row) };
+  // Tiles are centred on integer grid coords (see drawTile), so round, not floor
+  return { col: Math.round(col), row: Math.round(row) };
 }
 
 // ─── Drawing Functions ───────────────────────────────────────────────
@@ -623,7 +625,7 @@ function drawBuildingLabel(member) {
   const { x: cx, y: cy } = gridToScreen(centerCol, centerRow);
 
   const isPlayer = member.building === 'player';
-  const isT = isPlayer && String(member.level).startsWith('T');
+  const isT = isPlayer && String(member.level).startsWith('TG');
   const label = isT ? member.name + ' \u{1F451}' : member.name;
 
   let yOff = 0;
@@ -639,7 +641,7 @@ function drawBuildingLabel(member) {
 
   // Level for players
   if (isPlayer && member.level) {
-    const lvText = String(member.level).startsWith('T') ? member.level : 'Lv.' + member.level;
+    const lvText = String(member.level).startsWith('TG') ? member.level : 'Lv.' + member.level;
     ctx.font = `${Math.max(7, 9 * z)}px sans-serif`;
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.fillText(lvText, cx, cy - 6 * z + yOff);
@@ -977,6 +979,24 @@ canvas.addEventListener('touchend', (e) => {
 });
 
 // ─── Info Panel ──────────────────────────────────────────────────────
+// Distance (in tiles) between the building's centre and the centre of the nearest other Bear Trap
+function distanceToNearestTrapRow(member) {
+  const centre = m => {
+    const s = BUILDING_TYPES[m.building].size;
+    return { c: m.plot.col + (s - 1) / 2, r: m.plot.row + (s - 1) / 2 };
+  };
+  const me = centre(member);
+  let best = null;
+  alliance.members.forEach(m => {
+    if (m === member || m.building !== 'bear_trap') return;
+    const t = centre(m);
+    const d = Math.hypot(me.c - t.c, me.r - t.r);
+    if (!best || d < best.d) best = { d, name: m.name };
+  });
+  if (!best) return '';
+  return `<div class="info-row"><span class="info-label">Nearest Bear Trap</span><span class="info-value">${best.d.toFixed(1)} cases (${best.name})</span></div>`;
+}
+
 function showInfoPanel(member) {
   const panel = document.getElementById('info-panel');
   const bt = BUILDING_TYPES[member.building];
@@ -985,7 +1005,9 @@ function showInfoPanel(member) {
     <div class="info-row"><span class="info-label">Building</span><span class="info-value">${bt.label} (${bt.size}x${bt.size})</span></div>
     ${member.building === 'player' ? `<div class="info-row"><span class="info-label">Level</span><span class="info-value">${member.level}</span></div>` : ''}
     <div class="info-row"><span class="info-label">Position</span><span class="info-value">${displayCoords(member.plot.col, member.plot.row)}</span></div>
+    ${distanceToNearestTrapRow(member)}
     <button class="action-btn set-coord-btn" onclick="showSetCoordPanel(${member.plot.col}, ${member.plot.row})">Set Coordinates</button>
+    <button class="action-btn set-coord-btn" onclick="renameMember(${member.plot.col}, ${member.plot.row})">Edit Name</button>
     <button class="action-btn remove-btn" onclick="removeMember(${member.plot.col}, ${member.plot.row})">Remove</button>
   `;
   panel.style.display = 'block';
@@ -993,6 +1015,318 @@ function showInfoPanel(member) {
 
 function closeInfoPanel() {
   document.getElementById('info-panel').style.display = 'none';
+}
+
+// ─── Edit Name ───────────────────────────────────────────────────────
+function renameMember(col, row) {
+  const member = grid[row][col];
+  if (!member) return;
+  const name = prompt('Nouveau nom du bâtiment :', member.name);
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  member.name = trimmed;
+  saveToStorage();
+  showInfoPanel(member);
+  render();
+}
+
+// ─── Optimize around Bear Trap ───────────────────────────────────────
+// Level rank: T-levels above numeric ones, higher level first
+function levelRank(level) {
+  const s = String(level);
+  return s.startsWith('TG') ? 100 + parseInt(s.slice(2)) : parseInt(s) || 0;
+}
+
+// How strongly a building is pulled towards the trap: TG8 > TG7 > TG6 > the rest
+function distWeight(member) {
+  if (member.building !== 'player') return 1;
+  const s = String(member.level);
+  const t = s.startsWith('TG') ? parseInt(s.slice(2)) : 0;
+  return 1 + Math.max(0, t - 5);
+}
+
+// Number of occupied tiles sharing an edge with the footprint (higher = more compact)
+function edgeContact(col, row, size) {
+  let contact = 0;
+  for (let i = 0; i < size; i++) {
+    if (getCellOccupied(col + i, row - 1)) contact++;
+    if (getCellOccupied(col + i, row + size)) contact++;
+    if (getCellOccupied(col - 1, row + i)) contact++;
+    if (getCellOccupied(col + size, row + i)) contact++;
+  }
+  return contact;
+}
+
+function getCellOccupied(col, row) {
+  if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return false;
+  return grid[row][col] !== null;
+}
+
+// Holes = empty tiles inside the layout that are either walled in (not reachable from
+// outside the bounding box) or notches touching 3+ buildings. occ is a flat 0/1 array.
+function countLayoutHoles(occ, minC, minR, maxC, maxR) {
+  const W = maxC - minC + 3, H = maxR - minR + 3; // one-tile margin around the box
+  const isOcc = (c, r) => c >= 0 && r >= 0 && c < GRID_COLS && r < GRID_ROWS && occ[r * GRID_COLS + c] === 1;
+  const reached = new Uint8Array(W * H);
+  const stack = [];
+  for (let x = 0; x < W; x++) { stack.push([x, 0]); stack.push([x, H - 1]); }
+  for (let y = 0; y < H; y++) { stack.push([0, y]); stack.push([W - 1, y]); }
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    if (x < 0 || y < 0 || x >= W || y >= H || reached[y * W + x]) continue;
+    if (isOcc(x + minC - 1, y + minR - 1)) continue;
+    reached[y * W + x] = 1;
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+  }
+  let holes = 0;
+  for (let r = minR; r <= maxR; r++) {
+    for (let c = minC; c <= maxC; c++) {
+      if (isOcc(c, r)) continue;
+      const x = c - minC + 1, y = r - minR + 1;
+      const walls = (isOcc(c - 1, r) ? 1 : 0) + (isOcc(c + 1, r) ? 1 : 0) +
+                    (isOcc(c, r - 1) ? 1 : 0) + (isOcc(c, r + 1) ? 1 : 0);
+      if (!reached[y * W + x] || walls >= 3) holes++;
+    }
+  }
+  return holes;
+}
+
+function optimizeAroundBearTrap() {
+  const selected = selectedTile ? getMemberAt(selectedTile.col, selectedTile.row) : null;
+  const trap = selected?.building === 'bear_trap'
+    ? selected
+    : alliance.members.find(m => m.building === 'bear_trap');
+  if (!trap) { alert('Aucun Bear Trap sur la carte.'); return; }
+
+  // Everything except the chosen trap gets repositioned
+  const movable = alliance.members.filter(m => m !== trap);
+  if (movable.length === 0) return;
+  if (!confirm(`Réorganiser ${movable.length} bâtiment(s) autour du Bear Trap ${trap.name} ? Les positions actuelles ne seront pas restaurées.`)) return;
+
+  const originals = movable.map(m => ({ member: m, plot: { ...m.plot } }));
+  const restore = () => {
+    movable.forEach(m => removeFromGrid(m));
+    originals.forEach(o => { o.member.plot = o.plot; placeOnGrid(o.member); });
+  };
+
+  // Lift everything movable off the grid; the trap stays as the anchor
+  movable.forEach(m => removeFromGrid(m));
+
+  const ts = BUILDING_TYPES[trap.building].size;
+  const tc = trap.plot.col, tr = trap.plot.row;
+  // Players first (highest level closest to the trap), then other buildings
+  // (largest first) fill the remaining spots further out
+  const sorted = [...movable].sort((a, b) => {
+    const groupA = a.building === 'player' ? 0 : 1;
+    const groupB = b.building === 'player' ? 0 : 1;
+    if (groupA !== groupB) return groupA - groupB;
+    if (groupA === 0) return levelRank(b.level) - levelRank(a.level);
+    return BUILDING_TYPES[b.building].size - BUILDING_TYPES[a.building].size;
+  });
+
+  // Count empty tiles inside the bounding box of the trap and the placed buildings
+  const countHoles = (members) => {
+    let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+    members.forEach(m => {
+      const s = BUILDING_TYPES[m.building].size;
+      minC = Math.min(minC, m.plot.col); minR = Math.min(minR, m.plot.row);
+      maxC = Math.max(maxC, m.plot.col + s - 1); maxR = Math.max(maxR, m.plot.row + s - 1);
+    });
+    let holes = 0;
+    for (let r = minR; r <= maxR; r++)
+      for (let c = minC; c <= maxC; c++)
+        if (!grid[r][c]) holes++;
+    return holes;
+  };
+
+  const origin = new Map(originals.map(o => [o.member, o.plot]));
+  const toPlace = sorted;
+  // Bonus for staying on the current tile: a building only moves when packing gains more than this
+  const STAY_BONUS = 1500;
+
+  // Greedy packing is order-sensitive, so try several noisy runs
+  // and keep the best trade-off between empty tiles and number of moves
+  const TRIALS = 200;
+  let bestPlots = null, bestScore = Infinity, bestHoles = 0;
+  for (let t = 0; t < TRIALS; t++) {
+    const placed = [];
+    let ok = true;
+    for (const p of toPlace) {
+      const s = BUILDING_TYPES[p.building].size;
+      const home = origin.get(p);
+      let best = null, bestCost = Infinity;
+      for (let r = 0; r + s <= GRID_ROWS; r++) {
+        for (let c = 0; c + s <= GRID_COLS; c++) {
+          if (!canPlace(c, r, s)) continue;
+          // Pack against what is already placed (trap included), then stay close to the trap centre
+          const contact = edgeContact(c, r, s);
+          const dist = Math.hypot(c + s / 2 - (tc + ts / 2), r + s / 2 - (tr + ts / 2));
+          const noise = t === 0 ? 1 : 1 + Math.random() * 0.8;
+          const stay = c === home.col && r === home.row ? STAY_BONUS : 0;
+          const cost = -contact * 1000 - stay + dist * noise;
+          if (cost < bestCost) { bestCost = cost; best = { c, r }; }
+        }
+      }
+      if (!best) { ok = false; break; }
+      p.plot = { col: best.c, row: best.r };
+      placeOnGrid(p);
+      placed.push(p);
+    }
+    if (ok) {
+      const holes = countHoles([trap, ...placed]);
+      const moves = placed.filter(p => {
+        const o = origin.get(p);
+        return o.col !== p.plot.col || o.row !== p.plot.row;
+      }).length;
+      // Empty tiles weigh much more than moves: a gap is worse than relocating a building
+      const score = holes * 10 + moves;
+      if (score < bestScore) {
+        bestScore = score;
+        bestHoles = holes;
+        bestPlots = toPlace.map(m => ({ ...m.plot }));
+      }
+    }
+    placed.forEach(p => removeFromGrid(p));
+  }
+
+  if (!bestPlots) { restore(); alert('Pas assez de place autour du Bear Trap pour tous les bâtiments.'); return; }
+  // Local search: start from the greedy layout and nudge buildings to remove the holes,
+  // while penalising every building that leaves its original tile and any spread from the trap.
+  // Several restarts; keep the run with the fewest holes, then the fewest moves.
+  {
+    const occ = new Uint8Array(GRID_ROWS * GRID_COLS);
+    const mark = (c, r, s, v) => {
+      for (let y = r; y < r + s; y++) for (let x = c; x < c + s; x++) occ[y * GRID_COLS + x] = v;
+    };
+    const isFree = (c, r, s) => {
+      for (let y = r; y < r + s; y++) for (let x = c; x < c + s; x++) if (occ[y * GRID_COLS + x]) return false;
+      return true;
+    };
+    const statsOf = (list) => {
+      const occL = new Uint8Array(GRID_ROWS * GRID_COLS);
+      let minC = tc, minR = tr, maxC = tc + ts - 1, maxR = tr + ts - 1, moves = 0, spread = 0;
+      for (let y = tr; y < tr + ts; y++) for (let x = tc; x < tc + ts; x++) occL[y * GRID_COLS + x] = 1;
+      list.forEach((f, i) => {
+        for (let y = f.r; y < f.r + f.s; y++) for (let x = f.c; x < f.c + f.s; x++) occL[y * GRID_COLS + x] = 1;
+        minC = Math.min(minC, f.c); minR = Math.min(minR, f.r);
+        maxC = Math.max(maxC, f.c + f.s - 1); maxR = Math.max(maxR, f.r + f.s - 1);
+        const o = origin.get(toPlace[i]);
+        if (o.col !== f.c || o.row !== f.r) moves++;
+        const d = Math.hypot(f.c + f.s / 2 - (tc + ts / 2), f.r + f.s / 2 - (tr + ts / 2));
+        spread += toPlace[i].building === 'player' ? distWeight(toPlace[i]) * d : -0.5 * d;
+      });
+      return { holes: countLayoutHoles(occL, minC, minR, maxC, maxR), moves, spread, score: moves + spread };
+    };
+
+    const anneal = (startPlots) => {
+      occ.fill(0);
+      const cur = startPlots.map((p, i) => ({ c: p.col, r: p.row, s: BUILDING_TYPES[toPlace[i].building].size }));
+      mark(tc, tr, ts, 1);
+      cur.forEach(f => mark(f.c, f.r, f.s, 1));
+
+      // Energy: holes (heavy) + moves + a small pull towards the trap
+      const energy = () => {
+        let minC = tc, minR = tr, maxC = tc + ts - 1, maxR = tr + ts - 1, moves = 0, spread = 0;
+        cur.forEach((f, i) => {
+          minC = Math.min(minC, f.c); minR = Math.min(minR, f.r);
+          maxC = Math.max(maxC, f.c + f.s - 1); maxR = Math.max(maxR, f.r + f.s - 1);
+          const o = origin.get(toPlace[i]);
+          if (o.col !== f.c || o.row !== f.r) moves++;
+          const d = Math.hypot(f.c + f.s / 2 - (tc + ts / 2), f.r + f.s / 2 - (tr + ts / 2));
+          spread += toPlace[i].building === 'player' ? distWeight(toPlace[i]) * d : -0.5 * d;
+        });
+        return 10 * countLayoutHoles(occ, minC, minR, maxC, maxR) + moves + spread;
+      };
+
+      let E = energy(), bestE = E, best = cur.map(f => ({ ...f }));
+      const ITER = 150000, T0 = 3, T1 = 0.05, RANGE = 3;
+      for (let it = 0; it < ITER && bestE > 0; it++) {
+        const T = T0 * Math.pow(T1 / T0, it / ITER);
+        // Swap two same-size buildings: occupancy is unchanged, so only level order and moves change
+        if (Math.random() < 0.3) {
+          const a = cur[Math.floor(Math.random() * cur.length)];
+          const b = cur[Math.floor(Math.random() * cur.length)];
+          if (a === b || a.s !== b.s) continue;
+          [a.c, b.c] = [b.c, a.c];
+          [a.r, b.r] = [b.r, a.r];
+          const E2 = energy();
+          if (E2 <= E || Math.random() < Math.exp((E - E2) / T)) {
+            E = E2;
+            if (E < bestE) { bestE = E; best = cur.map(x => ({ ...x })); }
+          } else {
+            [a.c, b.c] = [b.c, a.c];
+            [a.r, b.r] = [b.r, a.r];
+          }
+          continue;
+        }
+        const f = cur[Math.floor(Math.random() * cur.length)];
+        const nc = f.c + Math.floor(Math.random() * (2 * RANGE + 1)) - RANGE;
+        const nr = f.r + Math.floor(Math.random() * (2 * RANGE + 1)) - RANGE;
+        if ((nc === f.c && nr === f.r) || nc < 0 || nr < 0 || nc + f.s > GRID_COLS || nr + f.s > GRID_ROWS) continue;
+        mark(f.c, f.r, f.s, 0);
+        if (!isFree(nc, nr, f.s)) { mark(f.c, f.r, f.s, 1); continue; }
+        const oldC = f.c, oldR = f.r;
+        f.c = nc; f.r = nr; mark(nc, nr, f.s, 1);
+        const E2 = energy();
+        if (E2 <= E || Math.random() < Math.exp((E - E2) / T)) {
+          E = E2;
+          if (E < bestE) { bestE = E; best = cur.map(x => ({ ...x })); }
+        } else {
+          mark(nc, nr, f.s, 0); f.c = oldC; f.r = oldR; mark(oldC, oldR, f.s, 1);
+        }
+      }
+      return { plots: best.map(f => ({ col: f.c, row: f.r })), ...statsOf(best) };
+    };
+
+    // Restart until a hole-free layout is found (or give up after MAX_RESTARTS to keep the UI responsive)
+    // Among hole-free runs, keep the one with the best trade-off between moves and level order
+    // Stop early once a hole-free run has been compared against a few others
+    const MAX_RESTARTS = 10;
+    let winner = null;
+    for (let k = 0; k < MAX_RESTARTS; k++) {
+      const res = anneal(bestPlots);
+      if (!winner || res.holes < winner.holes || (res.holes === winner.holes && res.score < winner.score)) winner = res;
+      if (winner.holes === 0 && k >= 2) break;
+    }
+    bestPlots = winner.plots;
+    bestHoles = winner.holes;
+  }
+
+  // Final pass: the set of player footprints is fixed, so hand the closest spots to the
+  // highest levels (TG8, then TG7, then TG6...). Occupancy does not change.
+  {
+    const trapDist = p => Math.hypot(p.col + 1 - (tc + ts / 2), p.row + 1 - (tr + ts / 2));
+    const playerIdx = toPlace.map((m, i) => i).filter(i => toPlace[i].building === 'player');
+    const slots = playerIdx.map(i => bestPlots[i]).sort((a, b) => trapDist(a) - trapDist(b));
+    playerIdx.sort((i, j) => levelRank(toPlace[j].level) - levelRank(toPlace[i].level))
+      .forEach((i, k) => { bestPlots[i] = { ...slots[k] }; });
+  }
+
+  // Holes of the final layout, for the console report
+  {
+    const occ = new Uint8Array(GRID_ROWS * GRID_COLS);
+    let minC = tc, minR = tr, maxC = tc + ts - 1, maxR = tr + ts - 1;
+    const add = (c, r, s) => {
+      minC = Math.min(minC, c); minR = Math.min(minR, r);
+      maxC = Math.max(maxC, c + s - 1); maxR = Math.max(maxR, r + s - 1);
+      for (let y = r; y < r + s; y++) for (let x = c; x < c + s; x++) occ[y * GRID_COLS + x] = 1;
+    };
+    add(tc, tr, ts);
+    toPlace.forEach((m, i) => add(bestPlots[i].col, bestPlots[i].row, BUILDING_TYPES[m.building].size));
+    bestHoles = countLayoutHoles(occ, minC, minR, maxC, maxR);
+  }
+
+  toPlace.forEach((m, i) => { m.plot = bestPlots[i]; placeOnGrid(m); });
+
+  const moves = toPlace.filter(m => {
+    const o = origin.get(m);
+    return o.col !== m.plot.col || o.row !== m.plot.row;
+  }).length;
+  console.log(`Optimize : ${moves} déplacement(s) sur ${toPlace.length} bâtiment(s) (${bestHoles} case(s) vide(s) dans la zone)`);
+
+  saveToStorage();
+  render();
 }
 
 // ─── Remove Member ───────────────────────────────────────────────────
@@ -1025,7 +1359,8 @@ function showAddPanel(col, row) {
   document.getElementById('add-name').value = '';
   const levelSel = document.getElementById('add-level');
   if (levelSel.options.length === 0) {
-    LEVELS.forEach(lv => {
+    // Dropdown only offers level 30 and above (and the T-levels)
+    LEVELS.filter(lv => lv.startsWith('TG') || parseInt(lv) >= 30).forEach(lv => {
       const opt = document.createElement('option');
       opt.value = lv;
       opt.textContent = lv;
@@ -1092,8 +1427,8 @@ function showSetCoordPanel(col, row) {
   const panel = document.getElementById('set-coord-panel');
   document.getElementById('set-coord-info').innerHTML =
     `<div style="font-size:12px;color:#8888aa;margin-bottom:4px">Tile ${displayCoords(col, row)}</div>`;
-  document.getElementById('set-coord-x').value = displayRow(row);
-  document.getElementById('set-coord-y').value = displayCol(col);
+  document.getElementById('set-coord-x').value = displayCol(col);
+  document.getElementById('set-coord-y').value = displayRow(row);
   panel.style.display = 'block';
   document.getElementById('set-coord-x').focus();
 }
@@ -1115,8 +1450,8 @@ function submitSetCoord() {
   const newX = parseInt(document.getElementById('set-coord-x').value);
   const newY = parseInt(document.getElementById('set-coord-y').value);
   if (isNaN(newX) || isNaN(newY)) return;
-  coordOffset.row = newX - (GRID_ROWS - 1 - setCoordTarget.row);
-  coordOffset.col = newY - setCoordTarget.col;
+  coordOffset.col = newX - setCoordTarget.col;
+  coordOffset.row = newY - setCoordTarget.row;
   closeSetCoordPanel();
   saveToStorage();
   render();
@@ -1202,7 +1537,8 @@ function loadFromData(data) {
   grid = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(null));
   (data.members || []).forEach(m => {
     const member = { name: m.name, plot: { col: m.col, row: m.row }, building: m.building };
-    if (m.level) member.level = m.level;
+    // Older saves used T1-T9; convert them to TG1-TG9
+    if (m.level) member.level = /^T\d+$/.test(String(m.level)) ? 'TG' + String(m.level).slice(1) : m.level;
     if (canPlace(m.col, m.row, BUILDING_TYPES[m.building].size)) {
       placeOnGrid(member);
       alliance.members.push(member);
